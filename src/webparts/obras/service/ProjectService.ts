@@ -61,6 +61,27 @@ export class ProjectService {
     );
   }
 
+  public async actualizarObra(id: number, obraActualizada: any): Promise<void> {
+    return this.updateObra(id, obraActualizada);
+  }
+
+  public async eliminarObra(id: number): Promise<void> {
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
+    await this._context.spHttpClient.post(
+      endpoint,
+      SPHttpClient.configurations.v1,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-type": "application/json",
+          "X-HTTP-Method": "DELETE",
+          "IF-MATCH": "*",
+          "odata-version": "",
+        },
+      },
+    );
+  }
+
   public async updateObra(id: number, obraActualizada: any): Promise<void> {
     const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
     const body = JSON.stringify({

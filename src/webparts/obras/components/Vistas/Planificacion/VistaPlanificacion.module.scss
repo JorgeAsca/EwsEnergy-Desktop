@@ -1,5 +1,4 @@
-// @import '~@microsoft/sp-office-ui-fabric-core/dist/sass/SPFabricCore.scss';
-@use "sass:color";
+@import '~@microsoft/sp-office-ui-fabric-core/dist/sass/SPFabricCore.scss';
 
 // Colores Corporativos
 $verde-oscuro: #004d40;
@@ -68,7 +67,7 @@ $verde-fondo: #f9fbf9;
     color: $blanco;
     padding: 10px;
     font-size: 13px;
-    border: 1px solid color.adjust($verde-oscuro, $lightness: -5%);
+    border: 1px solid darken($verde-oscuro, 5%);
   }
 
   .cellObra {

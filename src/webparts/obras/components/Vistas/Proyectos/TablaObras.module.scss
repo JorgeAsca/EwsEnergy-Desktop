@@ -1,50 +1,404 @@
-.container { padding: 10px; }
-.headerSection { margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
-.tituloPrincipal { font-weight: 600; color: #004d40; }
-.subtituloHeader { color: #605e5c; }
-.btnNuevaObra { background-color: #004d40; }
-.splitLayout { display: flex; gap: 20px; align-items: flex-start; }
+@import '~@fluentui/react/dist/sass/References.scss';
 
-.listColumn { flex: 1; max-width: 350px; background-color: #f8f9fa; border-radius: 8px; padding: 15px; }
-.listContainer { display: flex; flex-direction: column; }
-.listGroupHeader { font-weight: 700; color: #0078d4; text-transform: uppercase; font-size: 12px; }
-.listItem { background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-.selected { border-left: 4px solid #0078d4; background: #f3f2f1; }
-.obraTitle { font-weight: 600; }
-.progressTrackerBox { display: flex; gap: 4px; }
-.trackerDot { flex: 1; height: 6px; background-color: #edebe9; border-radius: 3px; }
-.filledOnTrack { background-color: #107c41; }
+$verde-oscuro: #004d40;
+$verde-claro: #8bc34a;
+$fondo-suave: #f9fbf9;
+$blanco: #ffffff;
+$texto-negro: #323130;
 
-.detailColumn { flex: 2; background: white; padding: 25px; border-radius: 8px; border: 1px solid #edebe9; }
-.detailContent { }
-.detailTitle { font-weight: 600; }
-.badgeEstado { padding: 5px 10px; border-radius: 12px; font-weight: 600; font-size: 12px; }
-.finalizado { background: #edebe9; color: #605e5c; }
-.cancelado { background: #fde7e9; color: #a4262c; }
-.activo { background: #dff6dd; color: #107c41; }
-.infoSection { margin: 20px 0; }
-.labelSeccion { font-weight: 600; color: #605e5c; }
-.iconVerde { color: #107c41; margin-right: 5px; }
-.planosSection { margin-top: 20px; }
-.sectionTitle { font-weight: 600; }
-.btnUpload { margin-top: 10px; }
-.planoCard { display: flex; align-items: center; gap: 10px; padding: 10px; background: #f3f2f1; border-radius: 4px; margin-bottom: 5px; }
-.pdfIcon { color: #a4262c; }
-.dwgIcon { color: #0078d4; }
-.historialSection { margin-top: 20px; }
-.fotoCard { padding: 10px; background: #f8f9fa; margin-bottom: 10px; }
-.fotoThumb { border-radius: 4px; }
-.fotoFecha { font-size: 11px; }
-.fotoComentarioBox { padding: 5px; background: white; margin-top: 5px; }
-.fotoComentarioText { font-style: italic; }
-.btnClose { }
-.emptyState { text-align: center; color: #999; padding: 50px; }
-.emptyIcon { font-size: 40px; }
+.container {
+  padding: 20px;
+  background-color: $blanco; 
+  min-height: 100vh;
 
-.modalFlotanteContainer { max-width: 600px; }
-.modalContent { padding: 20px; }
-.modalHeader { display: flex; justify-content: space-between; align-items: center; }
-.modalTitle { font-weight: 600; }
-.modalSeparator { margin: 10px 0; }
-.modalBody { max-height: 50vh; overflow-y: auto; }
-.modalFooter { margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; }
+  .headerSection {
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .tituloPrincipal {
+    color: $verde-oscuro;
+    font-weight: 700;
+  }
+
+  .subtituloHeader {
+    color: #666;
+  }
+
+  .btnNuevaObra {
+    background-color: $verde-oscuro;
+    border: none;
+    border-radius: 8px;
+
+    &:hover {
+      background-color: $verde-claro;
+    }
+  }
+}
+
+
+.splitLayout {
+  display: flex;
+  gap: 25px;
+  align-items: flex-start;
+}
+
+
+.listColumn {
+  width: 25%; 
+  min-width: 260px;
+  background: $blanco;
+  border-radius: 12px;
+  border: 1px solid #e1e1e1;
+  padding: 15px 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+
+  .listContainer { 
+    max-height: 75vh; 
+    overflow-y: auto; 
+    padding-right: 5px; 
+    
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+  }
+}
+
+.listGroupHeader {
+  font-size: 11px;
+  font-weight: 800;
+  color: #999;
+  text-transform: uppercase;
+  margin: 15px 0 8px 5px;
+  letter-spacing: 0.5px;
+}
+
+.listItem {
+  padding: 10px 12px; 
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: $blanco;
+
+  &:hover { 
+    border-color: $verde-claro; 
+    transform: translateX(2px); 
+    background-color: #fdfdfd;
+  }
+  
+  &.selected {
+    border-color: $verde-oscuro;
+    background-color: rgba(139, 195, 74, 0.05);
+  }
+
+  .obraTitle { 
+    font-size: 14px; 
+    font-weight: 700; 
+    color: $verde-oscuro; 
+    display: block; 
+    margin-bottom: 6px;
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
+  }
+}
+
+/* Cuadros de Progreso más finos */
+.progressTrackerBox {
+  display: flex;
+  gap: 3px;
+}
+
+.trackerDot {
+  height: 6px; 
+  flex: 1;
+  background-color: #eee;
+  border-radius: 3px;
+  transition: background-color 0.3s;
+  
+  &.filledOnTrack { background-color: $verde-claro; } 
+  &.filledDelayed { background-color: #d13438; }     
+  &.filledAhead { background-color: #0078d4; }       
+}
+
+.btnFinalizar {
+  color: #2e7d32;
+  &:hover { background-color: #e8f5e9; }
+}
+
+.bntCancelar {
+  color: #d32f2f;
+  &:hover { background-color: #ffebee; }
+}
+
+.accionesCard {
+  border-top: 1px solid #eee;
+  padding-top: 10px;
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+
+.badgeEstado {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  border: 1px solid;
+
+  &.finalizado {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #2e7d32;
+  }
+
+  &.activo {
+    background: #f1f8e9;
+    color: $verde-oscuro;
+    border-color: $verde-claro;
+  }
+
+  &.cancelado { 
+    background: #fde7e9;
+    color: #a4262c;
+    border-color: #a4262c;
+  }
+}
+
+/* COLUMNA DERECHA (DETALLES) */
+.detailColumn {
+  width: 65%;
+  background: $blanco;
+  border-radius: 12px;
+  border: 1px solid #e1e1e1;
+  min-height: 600px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.detailContent {
+  padding: 30px;
+}
+
+.detailTitle {
+  color: $verde-oscuro;
+  font-weight: 700;
+}
+
+.infoSection {
+  margin: 20px 0;
+
+  .labelSeccion {
+    font-size: 12px;
+    font-weight: 700;
+    color: #888;
+    margin-bottom: 4px;
+    display: block;
+    text-transform: uppercase;
+  }
+
+  .iconVerde {
+    color: $verde-claro;
+    margin-right: 5px;
+  }
+}
+
+/* Sección Planos */
+.planosSection {
+  margin-top: 30px;
+  background-color: #fcfcfc;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #eee;
+
+  .sectionTitle {
+    color: $verde-oscuro;
+    font-weight: 700;
+  }
+
+  .btnUpload {
+    border-color: $verde-claro;
+    color: $verde-oscuro;
+  }
+
+  .planoCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    background: $blanco;
+    cursor: pointer;
+
+    &:hover {
+      border-color: $verde-claro;
+    }
+
+    .pdfIcon {
+      color: #d13438;
+      font-size: 20px;
+    }
+
+    .dwgIcon {
+      color: #0078d4;
+      font-size: 20px;
+    }
+  }
+}
+
+/* Sección Historial / Fotos */
+.historialSection {
+  margin-top: 30px;
+
+  .sectionTitle {
+    color: $verde-oscuro;
+    font-weight: 700;
+    margin-bottom: 15px;
+    display: block;
+  }
+}
+
+.fotoCard {
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 12px;
+  background: $blanco;
+
+  .fotoThumb {
+    border-radius: 6px;
+    border: 1px solid #ddd;
+  }
+
+  .fotoFecha {
+    font-weight: 700;
+    color: $verde-oscuro;
+    font-size: 13px;
+  }
+
+  .fotoComentarioBox {
+    padding: 8px 12px;
+    background: $fondo-suave;
+    border-left: 3px solid $verde-claro;
+    margin-top: 8px;
+  }
+
+  .fotoComentarioText {
+    font-style: italic;
+    color: #555;
+    font-size: 13px;
+  }
+}
+
+/* Estado Vacío */
+.emptyState {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #999;
+
+  .emptyIcon {
+    font-size: 60px;
+    color: #e1e1e1;
+    margin-bottom: 20px;
+  }
+}
+
+/* --- MODAL DE CREACIÓN --- */
+.modalFlotanteContainer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  :global(.ms-Modal-main) {
+    background-color: $blanco !important;
+    border-radius: 16px !important;
+    border: 2px solid $verde-oscuro !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15) !important;
+    width: 100% !important;
+    max-width: 550px !important;
+    overflow: hidden !important;
+  }
+
+  .modalFooter {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+  }
+}
+
+.modalContent {
+  padding: 30px;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.modalTitle {
+  color: $verde-oscuro;
+  font-weight: 700;
+  margin: 0;
+}
+
+.btnClose {
+  color: #888;
+
+  &:hover {
+    color: #d32f2f;
+    background-color: #f8f8f8;
+    border-radius: 50%;
+  }
+}
+
+.modalSeparator {
+  margin: 15px 0;
+  border-color: #eee;
+}
+
+.modalBody {
+  margin-bottom: 25px;
+
+  :global(.ms-Label) {
+    color: $verde-oscuro !important;
+    font-weight: 600 !important;
+  }
+}
+
+.btnLaunch {
+  background-color: $verde-oscuro;
+  border: none;
+  border-radius: 8px;
+  height: 40px;
+  padding: 0 25px;
+
+  &:hover {
+    background-color: $verde-claro;
+  }
+}
+
+/* --- TRUCO PARA PANTALLA COMPLETA EN WORKBENCH --- */
+:global {
+  #workbenchPageContent,
+  .CanvasComponent.LgHost,
+  .CanvasZoneContainer,
+  .CanvasZone,
+  .SPCanvas-canvas {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+}
