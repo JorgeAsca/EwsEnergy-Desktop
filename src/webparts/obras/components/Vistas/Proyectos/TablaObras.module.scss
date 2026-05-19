@@ -315,6 +315,10 @@ $texto-negro: #323130;
 }
 
 /* --- MODAL DE CREACIÓN --- */
+.modalContainer {
+  @extend .modalFlotanteContainer;
+}
+
 .modalFlotanteContainer {
   display: flex !important;
   align-items: center !important;

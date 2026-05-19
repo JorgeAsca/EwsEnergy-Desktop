@@ -357,36 +357,62 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       </div>
 
       {/* MODAL DE CREACIÓN / EDICIÓN */}
-      <Modal isOpen={isOpen} onDismiss={() => setIsOpen(false)} containerClassName={styles.modalFlotanteContainer}>
-        <div className={styles.modalContent}>
-          <div className={styles.modalHeader}>
-            <Text variant="xLarge" className={styles.modalTitle}>{obraEditandoId ? "Editar Proyecto" : "Configurar Nuevo Proyecto"}</Text>
-            <IconButton iconProps={{ iconName: "Cancel" }} onClick={() => setIsOpen(false)} className={styles.btnClose} />
-          </div>
-          <Separator className={styles.modalSeparator} />
-          <div className={styles.modalBody}>
-            <Stack tokens={{ childrenGap: 15 }}>
-              <TextField label="Nombre del Proyecto" required value={nuevaObra.Nombre} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Nombre: v || "" })} />
-              <Dropdown label="Cliente" required options={clientes} selectedKey={nuevaObra.ClienteId} onChange={(_, opt) => setNuevaObra({ ...nuevaObra, ClienteId: opt?.key as number })} />
-              <TextField label="Dirección de Obra" value={nuevaObra.Direccion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Direccion: v || "" })} />
-              <Stack horizontal tokens={{ childrenGap: 20 }}>
-                <TextField label="Jornadas Presupuestadas" type="number" required value={nuevaObra.JornadasTotales.toString()} onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} styles={{ root: { flex: 1 } }} />
-                <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} styles={{ root: { flex: 1 } }} />
-              </Stack>
-            </Stack>
-          </div>
-          <div className={styles.modalFooter}>
-            <Stack horizontal tokens={{ childrenGap: 10 }} horizontalAlign="end">
-              {saving ? <Spinner label="Guardando..." /> : (
-                <>
-                  <PrimaryButton text={obraEditandoId ? "Actualizar" : "Lanzar Proyecto"} onClick={handleGuardar} disabled={!nuevaObra.Nombre || !nuevaObra.ClienteId} />
-                  <DefaultButton text="Cancelar" onClick={() => setIsOpen(false)} />
-                </>
-              )}
-            </Stack>
-          </div>
-        </div>
-      </Modal>
+      <Modal isOpen={isOpen} onDismiss={() => setIsOpen(false)} containerClassName={styles.modalContainer}>
+  <div className={styles.modalHeader}>
+    <Text variant="large" style={{ fontWeight: 600 }}>
+      {obraEditandoId ? "🔧 Modificar Parámetros de Obra" : "🚀 Lanzamiento de Nuevo Frente de Obra"}
+    </Text>
+    <IconButton iconProps={{ iconName: "Cancel" }} onClick={() => setIsOpen(false)} />
+  </div>
+
+  <div className={styles.modalBody}>
+    <Stack tokens={{ childrenGap: 15 }}>
+      <TextField label="Nombre del Proyecto / Frente" required value={nuevaObra.Nombre} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Nombre: v || "" })} />
+      
+      <Dropdown 
+        label="Cliente" 
+        required 
+        options={clientes} 
+        selectedKey={nuevaObra.ClienteId} 
+        onChange={(_, opt) => setNuevaObra({ ...nuevaObra, ClienteId: opt?.key as number })} 
+      />
+
+      <TextField 
+        label="Dirección de Obra" 
+        value={nuevaObra.Direccion} 
+        onChange={(_, v) => setNuevaObra({ ...nuevaObra, Direccion: v || "" })} 
+      />
+
+      {/* --- MAPA CON TAMAÑO FORZADO --- */}
+      <div style={{ width: '100%', height: '200px', marginTop: '10px', marginBottom: '10px', border: '1px solid #ccc', borderRadius: '4px', overflow: 'hidden' }}>
+        <iframe 
+          title="Mapa de Ubicación"
+          width="100%" 
+          height="100%" 
+          style={{ border: 0 }}
+          src={`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d1500!2d-3.70!3d40.41!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z${encodeURIComponent(nuevaObra.Direccion || "España")}!5e0!3m2!1ses!2ses!4v1600000000000`}
+          loading="lazy"
+        />
+      </div>
+
+      <Stack horizontal tokens={{ childrenGap: 20 }}>
+        <TextField label="Jornadas Presupuestadas" type="number" required value={nuevaObra.JornadasTotales.toString()} onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} styles={{ root: { flex: 1 } }} />
+        <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} styles={{ root: { flex: 1 } }} />
+      </Stack>
+    </Stack>
+  </div>
+
+  <div className={styles.modalFooter}>
+    <Stack horizontal tokens={{ childrenGap: 10 }} horizontalAlign="end">
+      {saving ? <Spinner label="Guardando..." /> : (
+        <>
+          <PrimaryButton text={obraEditandoId ? "Actualizar" : "Lanzar Proyecto"} onClick={handleGuardar} disabled={!nuevaObra.Nombre || !nuevaObra.ClienteId} />
+          <DefaultButton text="Cancelar" onClick={() => setIsOpen(false)} />
+        </>
+      )}
+    </Stack>
+  </div>
+</Modal>
     </div>
   );
 };
