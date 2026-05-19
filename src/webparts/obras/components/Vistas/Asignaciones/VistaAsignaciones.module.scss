@@ -11,109 +11,44 @@ $blanco: #ffffff;
   min-height: 100vh;
 }
 
-.headerArea {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-
-  .headerTitle {
-    font-size: 24px;
-    font-weight: 700;
-    color: $verde-oscuro;
-  }
+.title {
+  font-size: 24px;
+  font-weight: 700;
+  color: $verde-oscuro;
+  display: block;
+  margin-bottom: 5px;
 }
 
-.loader {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-} 
-
-.header{
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-
-  .headerTitle {
-    font-size: 24px;
-    font-weight: 700;
-    color: $verde-oscuro;
-  }
+.subtitle {
+  font-size: 14px;
+  color: #605e5c;
+  display: block;
+  margin-bottom: 25px;
 }
 
-.fieldWrapper {
-  margin-bottom: 20px;
+.panelAsignacion {
+  background: $blanco;
+  border-radius: 12px;
+  border: 1px solid #edebe9;
+  padding: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  max-width: 500px;
+  margin-bottom: 25px;
 }
 
-.personaName {
+.panelTitle {
   font-weight: 600;
   color: $verde-oscuro;
+  margin-bottom: 10px;
 }
 
-.semaforoText {
-  font-size: 12px;
-  font-weight: 600;
-  color: #333;
+.separator {
+  margin: 30px 0;
 }
 
-.emptyText {
-  text-align: center;
-  color: #777;
-  font-size: 14px;
-  margin-top: 40px;
-}
-
-
-.formContainer {
-  background-color: $blanco;
-  padding: 30px;
-  border-radius: 16px;
-  margin-bottom: 40px;
-  box-shadow: 0 4px 12px rgba(0, 77, 64, 0.05);
-  border: 1px solid #e8eee8;
-
-  :global(.ms-Label) {
-    color: $verde-oscuro !important;
-    font-weight: 600;
-  }
-
-
-  :global(.ms-Dropdown-title), 
-  :global(.ms-TextField-fieldGroup),
-  :global(.ms-DatePicker-container) {
-    background-color: $blanco !important;
-    border-color: #d1d1d1 !important;
-    color: #333 !important;
-    border-radius: 4px;
-  }
-}
-
-
-.dropdownLarge { 
-  width: 280px; 
-}
-
-.datePicker { 
-  width: 200px; 
-}
-
-.btnAsignar {
-  background-color: $verde-oscuro;
-  border: none;
-  border-radius: 8px;
-  height: 32px;
-  &:hover { 
-    background-color: $verde-claro; 
-  }
-}
-
-
-.grid {
+.gridObras {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 25px;
 }
 
@@ -123,41 +58,67 @@ $blanco: #ffffff;
   border: 1px solid #edebe9;
   padding: 25px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  
-  .obraTitle {
-    font-weight: 700;
-    color: $verde-oscuro;
-    font-size: 18px;
+}
+
+.obraHeader {
+  border-bottom: 1px solid #f3f2f1;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+}
+
+.obraTitle {
+  font-weight: 700;
+  font-size: 16px;
+  color: $verde-oscuro;
+  display: block;
+}
+
+.obraUbicacion {
+  font-size: 12px;
+  color: #797775;
+  display: block;
+  margin-top: 4px;
+}
+
+.personalList {
+  margin-top: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.personalRow {
+  background: #fbfbfb;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #f3f2f1;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: #f3f2f1;
   }
 }
 
-.assignmentItem {
-  padding: 12px;
-  border-radius: 8px;
-  background-color: #f8faf8;
-  border-left: 4px solid transparent;
-  margin-bottom: 8px;
-
-  &.retrasado { border-left-color: #d13438; }
-  &.critico { border-left-color: #ffaa44; }
-  &.atiempo { border-left-color: $verde-claro; }
+.personaName {
+  font-weight: 600;
+  color: #323130;
 }
 
-.statusBadge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+.semaforoText {
+  font-size: 11px;
+  font-weight: 600;
 }
-
-.bgFinalizado { background: #e8f5e9; color: $verde-claro; }
-.bgActivo { background: #e3f2fd; color: #0078d4; }
 
 .deleteBtn {
   color: #a19f9d;
-  &:hover { 
-    color: #d13438; 
-    background-color: #fff1f1; 
+  &:hover {
+    color: #a4262c !important;
+    background-color: #fde7e9;
   }
+}
+
+.emptyText {
+  font-style: italic;
+  color: #a19f9d;
+  text-align: center;
+  padding: 15px 0;
 }

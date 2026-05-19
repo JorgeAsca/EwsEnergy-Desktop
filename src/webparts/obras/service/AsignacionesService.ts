@@ -4,6 +4,7 @@ import { IAsignacion } from "../models/IAsignacion";
 import { ProjectService } from "./ProjectService";
 import { PersonalService } from "./PersonalService";
 import { IPersonal } from "../models/IPersonal";
+import { IObra } from "../models/IObra";
 
 export class AsignacionesService {
   private _context: WebPartContext;
@@ -51,6 +52,8 @@ export class AsignacionesService {
       FechaFinPrevista: fechaFin.toISOString(),
       EstadoProgreso: 0,
     };
+
+    
 
     const options: ISPHttpClientOptions = {
       headers: {
@@ -101,6 +104,34 @@ export class AsignacionesService {
       const error = await response.text();
       console.error("Detalle del error:", error);
       throw new Error("Error al guardar en SharePoint");
+    }
+  }
+
+  public async getObrasActivas(): Promise<IObra[]> {
+    const projectService = new ProjectService(this._context);
+    const obras = await projectService.getObras();
+    return obras.filter((o) => o.EstadoObra !== "Finalizado");
+  }
+
+  // Método requerido por VistaAsignaciones para listar operarios
+  public async getPersonalDisponible(): Promise<IPersonal[]> {
+    const personalService = new PersonalService(this._context);
+    return await personalService.getPersonal();
+  }
+
+  public calcularSemaforoAsignacion(fechaFinStr?: string) {
+    if (!fechaFinStr) return { label: "Sin fecha", presence: 0 };
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const fin = new Date(fechaFinStr);
+    fin.setHours(0, 0, 0, 0);
+
+    if (fin.getTime() < hoy.getTime()) {
+      return { label: "Finalizado / Concluido", presence: 4 }; // Rojo
+    } else if (fin.getTime() === hoy.getTime()) {
+      return { label: "Asiste Hoy", presence: 3 }; // Verde / Activo
+    } else {
+      return { label: "Programado Próximamente", presence: 2 }; // Disponible / Azul
     }
   }
 

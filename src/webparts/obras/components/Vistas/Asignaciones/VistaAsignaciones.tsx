@@ -8,10 +8,12 @@ import {
     PrimaryButton,
     IconButton,
     Spinner,
+    SpinnerSize,
     MessageBar,
     MessageBarType,
     DatePicker,
     Separator,
+    Icon,
 } from "@fluentui/react";
 import { AsignacionesService } from "../../../service/AsignacionesService";
 import { IObra } from "../../../models/IObra";
@@ -34,130 +36,155 @@ export const VistaAsignaciones: React.FC<{ context: any }> = (props) => {
         fechaFin: new Date(),
     });
 
-    // Instancia del servicio orquestador
     const service = React.useMemo(() => new AsignacionesService(props.context), [props.context]);
 
-    const cargarPanel = async () => {
+    const cargarDatos = React.useCallback(async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-            const res = await service.getDatosPanel(); // El servicio orquestador hace el trabajo pesado
-            setData(res);
-        } catch (e) {
-            setError("Error al cargar la logística de obras.");
+            const [obrasData, personalData, asignacionesData] = await Promise.all([
+                service.getObrasActivas(),
+                service.getPersonalDisponible(),
+                service.getAsignaciones(),
+            ]);
+            setData({ obras: obrasData, personal: personalData, asignaciones: asignacionesData });
+            setError(null);
+        } catch (err) {
+            setError("Error al cargar los datos de asignación.");
         } finally {
             setLoading(false);
         }
-    };
+    }, [service]);
 
     React.useEffect(() => {
-        cargarPanel().catch(console.error);
-    }, []);
+        cargarDatos();
+    }, [cargarDatos]);
 
     const handleAsignar = async () => {
-        const { obraId, personalId, fechaFin } = seleccion;
-        if (!obraId || !personalId) return;
+        if (!seleccion.obraId || !seleccion.personalId || !seleccion.fechaFin) {
+            alert("Por favor complete todos los campos requeridos");
+            return;
+        }
 
         try {
-            await service.crearAsignacion(obraId, personalId, fechaFin); // Lógica delegada al servicio
-            setSeleccion({ obraId: 0, personalId: 0, fechaFin: new Date() });
-            await cargarPanel();
-        } catch (e) {
-            setError("No se pudo completar la asignación.");
+            await service.crearAsignacion(seleccion.obraId, seleccion.personalId, seleccion.fechaFin);
+            setSeleccion((prev) => ({ ...prev, personalId: 0 }));
+            await cargarDatos();
+        } catch (err) {
+            alert("No se pudo registrar la asignación.");
         }
     };
 
     const handleEliminar = async (id: number) => {
-        if (!window.confirm("¿Estás seguro de eliminar esta asignación?")) return;
+        if (!confirm("¿Está seguro de remover este personal de la obra?")) return;
         try {
             await service.eliminarAsignacion(id);
-            await cargarPanel();
-        } catch (e) {
-            setError("Error al intentar eliminar el registro.");
+            await cargarDatos();
+        } catch (err) {
+            alert("Error al eliminar la asignación.");
         }
     };
 
-    const getSemaforoInfo = (fechaFin: Date | string) => {
-        const hoy = new Date();
-        const fin = new Date(fechaFin);
-        const difDias = (fin.getTime() - hoy.getTime()) / (1000 * 3600 * 24);
-
-        if (hoy > fin) return { clase: styles.retrasado, label: "Plazo Vencido" };
-        if (difDias < 7) return { clase: styles.critico, label: "Entrega Próxima" };
-        return { clase: styles.atiempo, label: "En Tiempo" };
+    const formatearFecha = (dateString?: string | Date): string => {
+        if (!dateString) return new Date().toLocaleDateString();
+        const d = new Date(dateString);
+        return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
     };
 
-    if (loading) return <Spinner label="Cargando logística EWS..." className={styles.loader} />;
+    if (loading) return <Spinner size={SpinnerSize.large} label="Sincronizando cuadrillas..." />;
 
     return (
         <div className={styles.container}>
-            <div className={styles.headerArea}>
-                <Text className={styles.header}>📅 Panel de Asignaciones</Text>
-            </div>
+            <Text variant="xLarge" className={styles.title}>Gestión de Personal y Asignaciones</Text>
+            <Text className={styles.subtitle}>Distribuye los operarios disponibles en los frentes de obra activos</Text>
 
-            <div className={styles.formContainer}>
-                <Stack horizontal verticalAlign="end" tokens={{ childrenGap: 20 }} wrap>
+            {error && <MessageBar messageBarType={MessageBarType.error}>{error}</MessageBar>}
+
+            <div className={styles.panelAsignacion}>
+                <Stack tokens={{ childrenGap: 15 }}>
+                    <Text variant="large" className={styles.panelTitle}>Nueva Programación de Obra</Text>
+                    
                     <Dropdown
-                        label="Obra"
-                        selectedKey={seleccion.obraId}
-                        options={data.obras.map((o) => ({ key: o.Id, text: o.Title }))}
-                        onChange={(_, opt) => setSeleccion({ ...seleccion, obraId: opt?.key as number })}
-                        className={styles.dropdownLarge}
+                        label="Seleccionar Frente de Obra"
+                        placeholder="Elija un proyecto activo"
+                        selectedKey={seleccion.obraId || undefined}
+                        options={data.obras.map((o) => ({ key: o.Id!, text: o.Title }))}
+                        onChange={(_, opt) => setSeleccion((prev) => ({ ...prev, obraId: opt?.key as number }))}
                     />
+
                     <Dropdown
-                        label="Trabajador"
-                        selectedKey={seleccion.personalId}
-                        options={data.personal.map((p) => ({ key: p.Id, text: p.NombreyApellido }))}
-                        onChange={(_, opt) => setSeleccion({ ...seleccion, personalId: opt?.key as number })}
-                        className={styles.dropdownLarge}
+                        label="Seleccionar Operario"
+                        placeholder="Elija un operario para el sitio"
+                        selectedKey={seleccion.personalId || undefined}
+                        options={data.personal.map((p) => ({ key: p.Id!, text: `${p.NombreyApellido} — (${p.Rol})` }))}
+                        onChange={(_, opt) => setSeleccion((prev) => ({ ...prev, personalId: opt?.key as number }))}
                     />
+
                     <DatePicker
-                        label="Fecha límite"
+                        label="Fecha de Trabajo / Ejecución"
+                        placeholder="¿Qué día asiste a la obra?"
                         value={seleccion.fechaFin}
-                        onSelectDate={(date) => setSeleccion({ ...seleccion, fechaFin: date || new Date() })}
-                        className={styles.datePicker}
+                        onSelectDate={(date) => setSeleccion((prev) => ({ ...prev, fechaFin: date || new Date() }))}
                     />
+
                     <PrimaryButton
-                        text="Asignar"
+                        text="Asignar y Programar"
                         onClick={handleAsignar}
-                        iconProps={{ iconName: "AddLink" }}
-                        className={styles.btnAsignar}
+                        disabled={!seleccion.obraId || !seleccion.personalId}
                     />
                 </Stack>
             </div>
 
-            {error && <MessageBar messageBarType={MessageBarType.error} onDismiss={() => setError(null)}>{error}</MessageBar>}
+            <Separator className={styles.separator} />
 
-            <div className={styles.grid}>
-                {data.obras.map((obra) => {
-                    const equipo = data.asignaciones.filter((a) => Number(a.ObraId) === Number(obra.Id));
-                    const esFinalizada = obra.EstadoObra === "Finalizado";
+            <div className={styles.gridObras}>
+                {data.obras.map((o) => {
+                    const asignados = data.asignaciones.filter((a) => a.ObraId === o.Id);
 
                     return (
-                        <div key={obra.Id} className={styles.obraCard}>
-                            <Stack tokens={{ childrenGap: 15 }}>
-                                <Stack horizontal horizontalAlign="space-between" verticalAlign="center">
-                                    <Text className={styles.obraTitle}>{obra.Title}</Text>
-                                    <div className={`${styles.statusBadge} ${esFinalizada ? styles.bgFinalizado : styles.bgActivo}`}>
-                                        {obra.EstadoObra || "En Curso"}
-                                    </div>
-                                </Stack>
-                                <Separator />
-                                <Stack tokens={{ childrenGap: 12 }}>
-                                    {equipo.length > 0 ? (
-                                        equipo.map((asig) => {
-                                            const p = data.personal.find((pers) => Number(pers.Id) === Number(asig.PersonalId));
-                                            const semaforo = getSemaforoInfo(asig.FechaFinPrevista);
+                        <div key={o.Id} className={styles.obraCard}>
+                            <Stack tokens={{ childrenGap: 10 }}>
+                                <div className={styles.obraHeader}>
+                                    <Text className={styles.obraTitle}>{o.Title}</Text>
+                                    <Text className={styles.obraUbicacion}>{o.DireccionObra}</Text>
+                                </div>
+
+                                <Text variant="medium" style={{ fontWeight: 600, marginTop: 5 }}>Cuadrilla Programada:</Text>
+                                
+                                <Stack tokens={{ childrenGap: 10 }} className={styles.personalList}>
+                                    {asignados.length > 0 ? (
+                                        asignados.map((asig) => {
+                                            const p = data.personal.find((per) => per.Id === asig.PersonalId);
+                                            const semaforo = service.calcularSemaforoAsignacion(asig.FechaFinPrevista?.toString());
+
                                             return (
-                                                <div key={asig.Id} className={`${styles.assignmentItem} ${semaforo.clase}`}>
-                                                    <Stack horizontal verticalAlign="center" horizontalAlign="space-between">
-                                                        <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 10 }}>
+                                                <div key={asig.Id} className={styles.personalRow}>
+                                                    <Stack horizontal horizontalAlign="space-between" verticalAlign="center" style={{ width: "100%" }}>
+                                                        <Stack horizontal tokens={{ childrenGap: 12 }} verticalAlign="center" style={{ flexGrow: 1 }}>
                                                             <Persona
-                                                                text={p?.NombreyApellido || "Desconocido"}
-                                                                size={PersonaSize.size32}
+                                                                imageUrl={p?.FotoPerfil}
+                                                                size={PersonaSize.size40}
+                                                                presence={semaforo.presence}
                                                             />
-                                                            <Stack>
+                                                            <Stack tokens={{ childrenGap: 2 }}>
                                                                 <Text className={styles.personaName}>{p?.NombreyApellido}</Text>
-                                                                <Text className={styles.semaforoText}>{semaforo.label}</Text>
+                                                                <Text className={styles.semaforoText} style={{ color: semaforo.presence === 4 ? "#d83b01" : "#107c41" }}>
+                                                                    {semaforo.label}
+                                                                </Text>
+                                                                
+                                                                <Stack horizontal tokens={{ childrenGap: 15 }} style={{ marginTop: 4, opacity: 0.85 }}>
+                                                                    <Stack horizontal tokens={{ childrenGap: 4 }} verticalAlign="center">
+                                                                        <Icon iconName="CalendarSettings" style={{ fontSize: 12, color: "#0078d4" }} />
+                                                                        <Text variant="small" style={{ color: "#323130" }}>
+                                                                            <b>Prog:</b> {formatearFecha((asig as any).Created)}
+                                                                        </Text>
+                                                                    </Stack>
+                                                                    <Stack horizontal tokens={{ childrenGap: 4 }} verticalAlign="center">
+                                                                        <Icon iconName="Balloons" style={{ fontSize: 12, color: "#107c41" }} />
+                                                                        <Text variant="small" style={{ color: "#323130" }}>
+                                                                            <b>Trabajo:</b> {formatearFecha(asig.FechaFinPrevista)}
+                                                                        </Text>
+                                                                    </Stack>
+                                                                </Stack>
                                                             </Stack>
                                                         </Stack>
                                                         <IconButton
