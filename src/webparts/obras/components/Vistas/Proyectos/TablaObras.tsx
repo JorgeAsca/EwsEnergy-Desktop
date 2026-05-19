@@ -21,14 +21,75 @@ import {
   IconButton,
   DefaultButton,
 } from "@fluentui/react";
-import { SPHttpClient } from "@microsoft/sp-http";
+import { SPFI } from "@pnp/sp";
+import "@pnp/sp/webs";
+import "@pnp/sp/lists";
+import "@pnp/sp/items";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import { SPComponentLoader } from '@microsoft/sp-loader';
+
 import { ProjectService } from "../../../service/ProjectService";
 import { PersonalService } from "../../../service/PersonalService";
 import { AsignacionesService } from "../../../service/AsignacionesService";
 import { IObraCard } from "../../../models/IObraCard";
 import styles from "./TablaObras.module.scss";
 
-export const TablaObras: React.FC<{ context: any }> = (props) => {
+// 1. Cargamos el CSS de Leaflet desde un CDN seguro para evitar errores de Webpack en SPFx
+SPComponentLoader.loadCss('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+
+// 2. Apuntamos las imágenes de los marcadores al CDN
+let DefaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+// Componente auxiliar para manejar clics y geocodificación inversa
+const LocationPicker: React.FC<{ 
+    position: [number, number], 
+    setPosition: (pos: [number, number]) => void,
+    setAddress: (addr: string) => void 
+}> = ({ position, setPosition, setAddress }) => {
+    const map = useMap();
+
+    useMapEvents({
+        // Tipamos 'e' como L.LeafletMouseEvent
+        click: async (e: L.LeafletMouseEvent) => {
+            const { lat, lng } = e.latlng;
+            setPosition([lat, lng]);
+            map.flyTo(e.latlng, map.getZoom());
+
+            // Geocodificación inversa gratuita con Nominatim (OpenStreetMap)
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                const data = await response.json();
+                if (data.display_name) {
+                    setAddress(data.display_name);
+                }
+            } catch (error) {
+                console.error("Error obteniendo dirección:", error);
+            }
+        },
+    });
+
+    return <Marker position={position} />;
+};
+
+// Componente para centrar el mapa cuando cambia la posición externamente
+const ChangeView = ({ center }: { center: [number, number] }) => {
+    const map = useMap();
+    map.setView(center);
+    return null;
+};
+
+export interface ITablaObrasProps {
+  sp: SPFI;
+}
+
+export const TablaObras: React.FC<ITablaObrasProps> = (props) => {
   // --- ESTADOS DE DATOS ---
   const [obras, setObras] = React.useState<IObraCard[]>([]);
   const [clientes, setClientes] = React.useState<IDropdownOption[]>([]);
@@ -43,46 +104,52 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [obraEditandoId, setObraEditandoId] = React.useState<number | null>(null);
 
+  // --- ESTADOS DE MAPA ---
+  const [formCoords, setFormCoords] = React.useState<[number, number]>([40.4167, -3.7037]); // Coordenadas para Modal
+  const [detailCoords, setDetailCoords] = React.useState<[number, number]>([40.4167, -3.7037]); // Coordenadas para Detalle
+
   // --- ESTADO DE FORMULARIO ---
   const [nuevaObra, setNuevaObra] = React.useState({
     Nombre: "",
     Descripcion: "",
     ClienteId: 0,
     Direccion: "",
+    EstadoObra: "Pendiente",
     FechaInicio: new Date(),
     FechaFin: new Date(),
     JornadasTotales: 30,
   });
 
+  const estadoOptions: IDropdownOption[] = [
+    { key: "Pendiente", text: "Pendiente" },
+    { key: "En Proceso", text: "En Proceso" },
+    { key: "Completado", text: "Completado" },
+  ];
+
   // --- SERVICIOS MEMOIZADOS ---
   const services = React.useMemo(() => ({
-    project: new ProjectService(props.context),
-    personal: new PersonalService(props.context),
-    asig: new AsignacionesService(props.context)
-  }), [props.context]);
+    project: new ProjectService(props.sp),
+    personal: new PersonalService(props.sp),
+    asig: new AsignacionesService(props.sp)
+  }), [props.sp]);
 
   // --- LÓGICA DE CARGA CENTRALIZADA ---
   const cargarTodo = async () => {
     try {
       setLoading(true);
-      const [listaObras, respClientes, listaAsignaciones, listaPersonal] = await Promise.all([
+      const [listaObras, listaClientes, listaAsignaciones, listaPersonal] = await Promise.all([
         services.project.getObras(),
-        props.context.spHttpClient.get(
-          `${props.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Clientes')/items?$select=Id,Title`,
-          SPHttpClient.configurations.v1
-        ),
+        props.sp.web.lists.getByTitle('Clientes').items.select("Id", "Title")(), // Petición migrada a PnPjs
         services.asig.getAsignaciones(),
         services.personal.getPersonal(),
       ]);
 
-      let opcionesClientes: IDropdownOption[] = [];
-      if (respClientes.ok) {
-        const dataC = await respClientes.json();
-        opcionesClientes = (dataC.value || []).map((c: any) => ({ key: c.Id, text: c.Title }));
-        setClientes(opcionesClientes);
-      }
+      const opcionesClientes: IDropdownOption[] = (listaClientes || []).map((c: any) => ({ 
+        key: c.Id, 
+        text: c.Title 
+      }));
+      setClientes(opcionesClientes);
 
-      // Transformación de datos (Preservando tu lógica de cálculo de jornadas y equipo)
       const obrasProcesadas: IObraCard[] = listaObras.map((o) => {
         const porcentajeReal = (o.ProgresoReal || 0) / 100;
         const asigsObra = (listaAsignaciones as any[]).filter(a => Number(a.ObraId) === Number(o.Id));
@@ -102,12 +169,11 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           porcentajeReal: Math.min(Math.max(porcentajeReal, 0), 1),
           operarios: operariosAsignados,
           jornadasConsumidas: parseFloat((porcentajeReal * (o.JornadasTotales || 30)).toFixed(1)),
-        };
+        } as IObraCard;
       });
 
       setObras(obrasProcesadas);
 
-      // Actualizar selección actual si existe
       if (obraSeleccionada) {
         const actualizada = obrasProcesadas.find(o => o.Id === obraSeleccionada.Id);
         if (actualizada) setObraSeleccionada(actualizada);
@@ -119,12 +185,30 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     }
   };
 
-  React.useEffect(() => { cargarTodo(); }, []);
+  React.useEffect(() => { 
+    if(props.sp) cargarTodo(); 
+  }, [props.sp]);
+
+  // --- MAPA: BUSCAR DIRECCIÓN (GEOCODING DIRECTO) ---
+  const buscarDireccion = async (addr: string, isDetail: boolean) => {
+    if (addr.length < 4) return;
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
+        const data = await response.json();
+        if (data && data.length > 0) {
+            const pos: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+            isDetail ? setDetailCoords(pos) : setFormCoords(pos);
+        }
+    } catch (e) { console.error(e); }
+  };
 
   // --- MANEJADORES DE ACCIONES ---
   const verDetallesObra = async (obra: IObraCard) => {
     setObraSeleccionada(obra);
     setLoadingFotos(true);
+    
+    if (obra.DireccionObra) buscarDireccion(obra.DireccionObra, true);
+
     try {
       const fotos = await services.project.getFotosPorObra(obra.Id as number);
       setFotosObra(fotos || []);
@@ -157,9 +241,10 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   const resetForm = () => {
     setObraEditandoId(null);
     setNuevaObra({
-      Nombre: "", Descripcion: "", ClienteId: 0, Direccion: "",
+      Nombre: "", Descripcion: "", ClienteId: 0, Direccion: "", EstadoObra: "Pendiente",
       FechaInicio: new Date(), FechaFin: new Date(), JornadasTotales: 30,
     });
+    setFormCoords([40.4167, -3.7037]); // Volver al centro por defecto
   };
 
   const handleAccionObra = async (id: number, accion: 'finalizar' | 'cancelar' | 'eliminar') => {
@@ -176,10 +261,8 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       if (accion === 'finalizar') await services.project.finalizarObra(id);
       if (accion === 'cancelar') await services.project.cancelarObra(id);
       if (accion === 'eliminar') {
-        const endpoint = `${props.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Proyectos y Obras')/items(${id})`;
-        await props.context.spHttpClient.post(endpoint, SPHttpClient.configurations.v1, {
-          headers: { 'Accept': 'application/json', 'IF-MATCH': '*', 'X-HTTP-Method': 'DELETE' }
-        });
+        // Petición de borrado migrada a PnPjs
+        await props.sp.web.lists.getByTitle('Proyectos y Obras').items.getById(id).delete();
       }
       setObraSeleccionada(null);
       await cargarTodo();
@@ -190,7 +273,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     }
   };
 
-  // --- RENDERIZADO DE APOYO ---
   const renderProgressTracker = (pReal: number) => {
     const totalBoxes = 10;
     const filledBoxes = Math.round(pReal * totalBoxes);
@@ -223,7 +305,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       </div>
 
       <div className={styles.splitLayout}>
-        {/* COLUMNA IZQUIERDA: LISTADO */}
+        {/* COLUMNA IZQUIERDA: LISTADO AGRUPADO */}
         <div className={styles.listColumn}>
           <div className={styles.listContainer}>
             {Object.keys(obrasAgrupadas).length === 0 && <MessageBar>No hay proyectos registrados.</MessageBar>}
@@ -241,7 +323,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: DETALLE */}
+        {/* COLUMNA DERECHA: DETALLES */}
         <div className={styles.detailColumn}>
           {obraSeleccionada ? (
             <div className={styles.detailContent}>
@@ -259,10 +341,12 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                     Nombre: obraSeleccionada.Title, Descripcion: obraSeleccionada.Descripcion || "",
                     ClienteId: (clientes.find(c => c.text === obraSeleccionada.clienteNombre)?.key as number) || 0,
                     Direccion: obraSeleccionada.DireccionObra || "",
+                    EstadoObra: obraSeleccionada.EstadoObra || "Pendiente",
                     FechaInicio: new Date(obraSeleccionada.FechaInicio || Date.now()),
                     FechaFin: new Date(obraSeleccionada.FechaFinPrevista || Date.now()),
                     JornadasTotales: obraSeleccionada.JornadasTotales || 30
                   });
+                  if(obraSeleccionada.DireccionObra) buscarDireccion(obraSeleccionada.DireccionObra, false);
                   setIsOpen(true);
                 }} />
               </Stack>
@@ -289,6 +373,17 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                   ) : <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>Sin personal asignado</Text>}
                 </Stack>
               </Stack>
+
+              {/* MAPA DE VISTA DETALLE */}
+              {obraSeleccionada.DireccionObra && (
+                 <div style={{ width: '100%', height: '200px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e1dfdd', marginTop: '15px' }}>
+                     <MapContainer center={detailCoords} zoom={15} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+                         <ChangeView center={detailCoords} />
+                         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                         <Marker position={detailCoords} />
+                     </MapContainer>
+                 </div>
+              )}
 
               <div className={styles.planosSection}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
@@ -368,7 +463,32 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
             <Stack tokens={{ childrenGap: 15 }}>
               <TextField label="Nombre del Proyecto" required value={nuevaObra.Nombre} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Nombre: v || "" })} />
               <Dropdown label="Cliente" required options={clientes} selectedKey={nuevaObra.ClienteId} onChange={(_, opt) => setNuevaObra({ ...nuevaObra, ClienteId: opt?.key as number })} />
-              <TextField label="Dirección de Obra" value={nuevaObra.Direccion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Direccion: v || "" })} />
+              
+              <TextField 
+                label="Dirección / Ubicación" 
+                value={nuevaObra.Direccion} 
+                onChange={(_, v) => {
+                  setNuevaObra({ ...nuevaObra, Direccion: v || "" });
+                  buscarDireccion(v || "", false);
+                }} 
+                placeholder="Escribe la dirección o selecciona en el mapa"
+              />
+
+              {/* MAPA INTERACTIVO DE FORMULARIO */}
+              <div style={{ width: '100%', height: '220px', borderRadius: '8px', overflow: 'hidden', border: '1px solid #e1dfdd' }}>
+                  <MapContainer center={formCoords} zoom={13} style={{ height: '100%', width: '100%', zIndex: 0 }}>
+                      <ChangeView center={formCoords} />
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <LocationPicker 
+                        position={formCoords} 
+                        setPosition={setFormCoords} 
+                        setAddress={(addr) => setNuevaObra({ ...nuevaObra, Direccion: addr })} 
+                      />
+                  </MapContainer>
+              </div>
+
+              <Dropdown label="Estado" required options={estadoOptions} selectedKey={nuevaObra.EstadoObra} onChange={(_, opt) => setNuevaObra({ ...nuevaObra, EstadoObra: opt?.key as string })} />
+              
               <Stack horizontal tokens={{ childrenGap: 20 }}>
                 <TextField label="Jornadas Presupuestadas" type="number" required value={nuevaObra.JornadasTotales.toString()} onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} styles={{ root: { flex: 1 } }} />
                 <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} styles={{ root: { flex: 1 } }} />
