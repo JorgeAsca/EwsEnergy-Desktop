@@ -1,0 +1,182 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+// --- VARIABLES DE IDENTIDAD EWS ---
+$verde-oscuro: #004d40; 
+$verde-claro: #8bc34a;  
+$fondo-suave: #f9fbf9;  
+$borde-suave: #e8eee8;
+
+.obras {
+  min-height: 100vh;
+  // CORRECCIÓN DE NIVELACIÓN: 
+  // SharePoint mete un espacio arriba por defecto. Con esto lo anulamos para que 
+  // el inicio de la app coincida con el borde superior del navegador.
+  margin: -1.25rem 0 0 0; 
+  padding: 0;
+  overflow: hidden;
+
+  .appWrapper {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    max-width: 100%;
+    align-items: stretch; // Forza a que Sidebar y Content midan lo mismo de alto
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 260px;
+    background-color: #ffffff;
+    border-right: 1px solid $borde-suave;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: transform 0.3s ease-in-out;
+    z-index: 100;
+    position: relative;
+
+    @media (max-width: 768px) {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      box-shadow: 5px 0 15px rgba(0,0,0,0.1);
+      transform: translateX(-100%);
+
+      &.isOpen {
+        transform: translateX(0);
+      }
+    }
+
+    @media (min-width: 1900px) {
+      width: 350px;
+      .logoArea {
+        padding: 50px 20px;
+        span { font-size: 2.2rem !important; }
+      }
+    }
+
+    .logoArea {
+      background-color: $verde-oscuro;
+      // Altura ajustada para que el logo tenga presencia y combine con el header
+      height: 75px; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      border-bottom: 4px solid $verde-claro;
+      box-sizing: border-box;
+      
+      span {
+        letter-spacing: 2px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+    }
+
+    // --- SOBREESCRITURA DE COLORES FLUENT UI ---
+    :global {
+      .ms-Nav-link {
+        color: $verde-oscuro !important;
+        background-color: transparent;
+        height: 50px;
+        
+        &:hover {
+          background-color: rgba(139, 195, 74, 0.1) !important;
+          color: $verde-oscuro !important;
+        }
+
+        &::after {
+          border-left: 4px solid transparent !important;
+        }
+      }
+
+      .is-selected .ms-Nav-link {
+        background-color: $fondo-suave !important;
+        color: $verde-claro !important;
+        font-weight: bold !important;
+
+        &::after {
+          border-left: 4px solid $verde-claro !important;
+        }
+
+        .ms-Nav-linkText { color: $verde-claro !important; }
+        .ms-Icon { color: $verde-claro !important; }
+      }
+
+      .ms-Nav-compositeLink .ms-Icon { color: $verde-oscuro; }
+    }
+
+    :global(.ms-Nav) {
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+  }
+
+  .mainContent {
+    flex: 1;
+    min-width: 0;
+    background-color: $fondo-suave;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .header {
+      background-color: #ffffff;
+      padding: 0 32px;
+      // IGUALAMOS ALTURA: Debe medir lo mismo que el logoArea del sidebar
+      height: 75px; 
+      border-bottom: 1px solid $borde-suave;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      box-sizing: border-box;
+
+      .headerLeft {
+        display: flex;
+        align-items: center;
+        
+        .menuButton {
+          display: none;
+          margin-right: 15px;
+          color: $verde-oscuro;
+
+          @media (max-width: 768px) { display: block; }
+        }
+      }
+
+      .headerRight {
+        display: flex;
+        align-items: center;
+        color: $verde-oscuro;
+        
+        b {
+          margin-left: 8px;
+          color: $verde-oscuro;
+        }
+      }
+    }
+
+    .pageBody {
+      padding: 24px;
+      @media (min-width: 1024px) { padding: 32px; }
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex-grow: 1;
+    }
+  }
+
+  .overlay {
+    @media (max-width: 768px) {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.4);
+      z-index: 90;
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "ews-energy-client-side-solution",
+    "id": "c1ba0b56-e391-447e-9c3c-501ab1ffa0c0",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.22.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "ews-energy description"
+      },
+      "longDescription": {
+        "default": "ews-energy description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "ews-energy Feature",
+        "description": "The feature that activates elements of the ews-energy solution.",
+        "id": "566bbb72-c5d4-4fc7-8252-2ed083940a88",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/ews-energy.sppkg"
+  }
+}

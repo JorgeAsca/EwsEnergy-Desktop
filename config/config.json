@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "obras-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/obras/ObrasWebPart.js",
+          "manifest": "./src/webparts/obras/ObrasWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "ObrasWebPartStrings": "lib/webparts/obras/loc/{locale}.js"
+  }
+}

@@ -1,0 +1,166 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+
+$verde-oscuro: #004d40;
+$verde-claro: #8bc34a;
+$fondo-suave: #f9fbf9;
+$blanco: #ffffff;
+
+.container {
+    padding: 30px;
+    background-color: $fondo-suave;
+    min-height: 100vh;
+    position: relative; 
+}
+
+.headerSection {
+    margin-bottom: 40px;
+    border-bottom: 2px solid rgba(0, 77, 64, 0.1);
+    padding-bottom: 20px;
+}
+
+.tituloPrincipal {
+    color: $verde-oscuro;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.subtitulo {
+    color: #605e5c;
+    font-style: italic;
+}
+
+.btnNuevo {
+    border-radius: 8px;
+    background-color: $verde-oscuro;
+    border: none;
+    &:hover { background-color: $verde-claro; }
+}
+
+/* Grid y Tarjetas */
+.gridPersonal {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 30px;
+}
+
+.cardEmpleado, .cardEmpleadoShimmer {
+    position: relative;
+    background: $blanco;
+    border-radius: 16px;
+    border: 1px solid #edebe9;
+    padding: 25px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    overflow: visible;
+
+    &:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 24px rgba(0, 77, 64, 0.12);
+        border-color: $verde-claro;
+    }
+
+    &:hover .editOverlay { opacity: 1; }
+}
+
+.editOverlay {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    opacity: 0; 
+    transition: opacity 0.2s ease;
+    z-index: 5; 
+}
+
+.editButton {
+    background-color: $blanco;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    color: $verde-oscuro;
+    &:hover { background-color: $verde-oscuro; color: $blanco; }
+}
+
+.avatarArea {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.nombre {
+    font-size: 18px;
+    font-weight: 700;
+    color: $verde-oscuro;
+}
+
+.cargo {
+    font-size: 11px;
+    color: $verde-claro;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.iconCargo { color: $verde-claro; font-size: 14px; }
+.cardSeparator { margin: 15px 0; }
+.idEmpleado { font-size: 11px; color: #a19f9d; font-weight: 600; }
+.iconContact { color: #edebe9; font-size: 16px; }
+
+/* --- ESTILOS MODAL FLOTANTE --- */
+.modalFlotante {
+    :global(.ms-Modal-main) {
+        background-color: $blanco;
+        border-radius: 16px;
+        border: 2px solid $verde-oscuro;
+        box-shadow: 0 10px 40px rgba(0, 77, 64, 0.2);
+        max-width: 550px;
+        width: 100%;
+        animation: fadeInDown 0.3s ease-out;
+    }
+}
+
+.modalContent { padding: 30px; }
+
+.modalHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modalTitle { color: $verde-oscuro; font-weight: 700; }
+.modalSeparator { margin: 10px 0 20px 0; }
+
+.modalBody {
+    :global(.ms-Label) { color: $verde-oscuro; font-weight: 600; }
+}
+
+.previewBox {
+    padding: 20px;
+    background: #f8faf8;
+    border-radius: 12px;
+    border: 2px dashed $verde-claro;
+    margin-top: 10px;
+}
+.previewTitle { font-weight: 600; color: $verde-oscuro; }
+
+.modalFooter { margin-top: 30px; }
+
+.btnPanelPrimary { background-color: $verde-oscuro; border: none; }
+.btnDelete {
+    color: #a4262c;
+    border-color: #a4262c;
+    &:hover { background-color: #fff1f1; color: #a4262c; border-color: #a4262c; }
+}
+
+.btnConfirmDelete {
+    background-color: #a4262c;
+    border-color: #a4262c;
+}
+
+/* Helpers Shimmer */
+.shimmerSeparator { margin: 15px 0; width: 100%; }
+.fullWidth { width: 100%; }
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}

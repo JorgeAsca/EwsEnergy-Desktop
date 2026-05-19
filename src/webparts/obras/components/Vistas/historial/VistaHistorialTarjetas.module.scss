@@ -1,0 +1,169 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+// --- TUS VARIABLES ORIGINALES (MANTENIDAS) ---
+$verde-oscuro: #004d40;
+$verde-claro: #8bc34a;
+$verde-fondo: #f9fbf9;
+$blanco: #ffffff;
+
+.container {
+    padding: 20px; // Ajustado para ser más flexible
+    background-color: $verde-fondo;
+    min-height: 100vh;
+
+    @media (min-width: 1024px) {
+        padding: 30px;
+    }
+}
+
+.loader { 
+    margin-top: 100px; 
+    display: flex;
+    justify-content: center;
+}
+
+.headerSection {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid rgba(0, 77, 64, 0.1);
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    
+    // CORRECCIÓN RESPONSIVE: En móvil se ponen uno debajo de otro
+    flex-wrap: wrap; 
+    gap: 15px;
+
+    @media (max-width: 640px) {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+.titulo {
+    color: $verde-oscuro;
+    font-weight: 700;
+    margin: 0;
+}
+
+.subtitulo { 
+    color: #666; 
+    font-style: italic; 
+    font-size: 0.9rem;
+}
+
+.searchBar {
+    width: 350px; // Ancho máximo en PC
+    border-radius: 8px;
+    border-color: #e1e1e1;
+    transition: all 0.2s;
+
+    &:hover { border-color: $verde-claro; }
+
+    // CORRECCIÓN RESPONSIVE: En móvil ocupa el 100%
+    @media (max-width: 640px) {
+        width: 100% !important;
+    }
+}
+
+/* --- GRID DE REPORTES (MODIFICADO PARA MÓVIL) --- */
+.cardGrid {
+    display: grid;
+    gap: 20px;
+    // auto-fill con minmax asegura que en PC/TV haya varias columnas 
+    // y en móvil se ajuste a 1 sola automáticamente.
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+
+    @media (max-width: 480px) {
+        grid-template-columns: 1fr; 
+        gap: 15px;
+    }
+}
+
+.reporteCard {
+    background: $blanco;
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e1e1e1;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+
+    &:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 24px rgba(0, 77, 64, 0.1);
+        border-color: $verde-claro;
+    }
+
+    .cardHeader {
+        padding: 15px 20px;
+        background: #ffffff;
+        border-bottom: 1px solid #f0f0f0;
+        
+        .obraName { 
+            font-weight: 700; 
+            display: block; 
+            color: $verde-oscuro; 
+            font-size: 16px;
+        }
+        .fechaText {
+            color: #888;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+    }
+
+    .imageContainer { 
+        width: 100%; 
+        height: 200px; // Altura fija para que todas las tarjetas sean iguales
+        background: #f3f2f1;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .reporteImagen {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; // Asegura que la foto llene el espacio sin deformarse
+        transition: transform 0.5s ease;
+        &:hover { transform: scale(1.05); }
+    }
+
+    .cardContent {
+        padding: 20px;
+        flex-grow: 1;
+
+        .comentarioBox {
+            background: $verde-fondo;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid $verde-claro;
+            margin-bottom: 15px;
+            min-height: 50px;
+
+            .comentarios {
+                font-size: 14px;
+                color: #444;
+                line-height: 1.4;
+            }
+        }
+
+        .footerOperario {
+            padding-top: 10px;
+            border-top: 1px solid #f0f0f0;
+            color: #666;
+
+            .iconOperario {
+                color: $verde-oscuro;
+            }
+            
+            b {
+                color: $verde-oscuro;
+            }
+        }
+    }
+}

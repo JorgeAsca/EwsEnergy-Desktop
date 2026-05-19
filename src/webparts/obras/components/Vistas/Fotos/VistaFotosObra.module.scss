@@ -1,0 +1,277 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+$verde-oscuro: #004d40;
+$verde-claro: #8bc34a;
+$fondo-suave: #f9fbf9;
+$borde-suave: #e8eee8;
+$blanco: #ffffff;
+
+.container {
+  background-color: $fondo-suave;
+  min-height: 100vh;
+  padding-bottom: 40px;
+}
+
+.appHeader {
+  background: $verde-oscuro;
+  color: $blanco;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 77, 64, 0.15);
+}
+
+.title {
+  font-weight: 700;
+  margin: 0;
+  color: $blanco;
+}
+
+.subtitle {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+/* Navegación del Wizard */
+.wizardNav {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px 0;
+  background-color: $blanco;
+  border-bottom: 1px solid #eee;
+
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #ddd;
+    transition: all 0.3s;
+
+    &.active {
+      background-color: $verde-claro;
+      transform: scale(1.2);
+    }
+  }
+}
+
+.mainContent {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.stepContainer {
+  background: $blanco;
+  padding: 25px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  animation: fadeInRight 0.3s ease-out;
+}
+
+.stepTitle {
+  color: $verde-oscuro;
+  font-weight: 800;
+  margin-bottom: 15px;
+  display: block;
+}
+
+.instruccion {
+  color: #666;
+  margin-bottom: 20px;
+  display: block;
+}
+
+/* Tarjetas Paso 1 */
+.userCard,
+.obraCard {
+  border: 1px solid $borde-suave;
+  border-radius: 12px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: $verde-claro;
+    background-color: #f1f8e9;
+  }
+}
+
+.obraTitle {
+  font-weight: 700;
+  color: $verde-oscuro;
+  font-size: 16px;
+}
+
+/* Lista Equipo Paso 2 */
+.teamList {
+  margin-bottom: 10px;
+}
+
+.teamMemberItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+/* Sección para añadir personal extra */
+.extraSection {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px dashed #ccc;
+
+  :global(.ms-Dropdown-title) {
+    border-color: $verde-claro;
+    border-radius: 6px;
+  }
+}
+
+/* Botones Grandes Paso 3 */
+.progressContainer {
+  margin-top: 15px;
+}
+
+.progressBtn {
+  width: 100%;
+  padding: 20px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background-color: #f8f8f8;
+  color: #555;
+  transition: all 0.2s;
+
+  i {
+    font-size: 22px;
+  }
+
+  &.selected {
+    transform: scale(1.02);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+  }
+
+  &.btnVerde.selected {
+    background-color: #e8f5e9;
+    border-color: #2e7d32;
+    color: #2e7d32;
+  }
+
+  &.btnAmarillo.selected {
+    background-color: #fff8e1;
+    border-color: #fbc02d;
+    color: #f57f17;
+  }
+
+  &.btnNaranja.selected {
+    background-color: #fff3e0;
+    border-color: #f57c00;
+    color: #e65100;
+  }
+
+  &.btnRojo.selected {
+    background-color: #ffebee;
+    border-color: #d32f2f;
+    color: #c62828;
+  }
+}
+
+/* Zona de Fotos Paso 4 */
+.photoDropzone {
+  border: 2px dashed $verde-claro;
+  border-radius: 16px;
+  padding: 40px 20px;
+  text-align: center;
+  color: $verde-oscuro;
+  background: #f1f8e9;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.bigIcon {
+  font-size: 48px;
+  color: $verde-claro;
+}
+
+.previewContainer {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+
+.previewItem {
+  position: relative;
+  width: 100px;
+  height: 100px;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+}
+
+.removePhoto {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: white;
+  border-radius: 50%;
+  color: #d32f2f;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.gpsBadge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background-color: #0078d4;
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+
+  i {
+    font-size: 12px; // Tamaño del icono MapPin
+  }
+}
+
+.btnEws {
+  background-color: $verde-oscuro;
+  border: none;
+  border-radius: 8px;
+
+  &:hover {
+    background-color: $verde-claro;
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

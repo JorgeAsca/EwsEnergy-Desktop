@@ -1,0 +1,157 @@
+@import '~@microsoft/sp-office-ui-fabric-core/dist/sass/SPFabricCore.scss';
+
+// Colores Corporativos
+$verde-oscuro: #004d40;
+$verde-claro: #8bc34a;
+$blanco: #ffffff;
+$verde-fondo: #f9fbf9;
+
+.vistaPlanificacion {
+  padding: 15px;
+  background-color: $verde-fondo;
+
+  .titulo {
+    color: $verde-oscuro;
+    font-weight: 700;
+  }
+}
+
+// Panel Personal Superior
+.personalPanelTop {
+  background-color: $blanco;
+  padding: 10px 15px;
+  border-radius: 4px;
+  border: 1px solid #e1e1e1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+
+  .personalListHorizontal {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 5px 0;
+    &::-webkit-scrollbar { height: 4px; }
+    &::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+  }
+}
+
+.draggablePersonaCard {
+  cursor: grab;
+  padding: 4px 10px;
+  background-color: #f3f2f1;
+  border-radius: 15px;
+  border: 1px solid #ddd;
+  white-space: nowrap;
+  transition: all 0.2s;
+  &:hover { border-color: $verde-claro; background-color: #fff; transform: translateY(-1px); }
+}
+
+// Contenedor de Tabla
+.tableContainer {
+  flex: 1;
+  background-color: $blanco;
+  border: 1px solid #e1e1e1;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.planTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+
+  .colObra { width: 150px; }
+  .colDia { width: auto; }
+
+  thead th {
+    background-color: $verde-oscuro;
+    color: $blanco;
+    padding: 10px;
+    font-size: 13px;
+    border: 1px solid darken($verde-oscuro, 5%);
+  }
+
+  .cellObra {
+    padding: 12px 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    span { font-weight: 600; color: $verde-oscuro; font-size: 12px; }
+  }
+
+  .dropZone {
+    height: 75px;
+    border: 1px solid #eee;
+    vertical-align: top;
+  }
+}
+
+.asignadosConsola {
+  display: flex;
+  flex-direction: column; /* Cambiado para apilar los nombres verticalmente */
+  gap: 6px;
+  padding: 6px;
+  justify-content: flex-start;
+}
+
+.fotoAsignada {
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  /* El transform: scale() suele verse raro con texto, lo cambiamos a un efecto de fondo */
+  &:hover { 
+    background-color: #f3f2f1; 
+  }
+}
+
+// PANEL PENDIENTES FIJO E INDEPENDIENTE
+.pendingPanel {
+  width: 220px;
+  min-width: 220px;
+  background-color: #fff8f8;
+  border: 1px solid #f9e1e1;
+  padding: 12px;
+  border-radius: 4px;
+  
+  display: flex;
+  flex-direction: column;
+  max-height: 550px; // Altura máxima para no deformar la vista
+  position: sticky;
+  top: 10px;
+
+  .panelTituloCompacto {
+    font-weight: 700;
+    font-size: 13px;
+    color: #a4262c;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .pendingList {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar-thumb { background: #f1c4c4; border-radius: 10px; }
+  }
+
+  .emptyText {
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+    margin-top: 20px;
+    font-style: italic;
+  }
+}
+
+.pendingItem {
+  background-color: $blanco;
+  border-left: 3px solid #d13438;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+
+  .pendingName { font-weight: 700; font-size: 11px; color: $verde-oscuro; word-break: break-word; }
+  .pendingReason { font-size: 10px; color: #666; display: block; margin-top: 3px; line-height: 1.3; }
+}

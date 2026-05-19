@@ -1,0 +1,163 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+$verde-oscuro: #004d40;
+$verde-claro: #8bc34a;
+$verde-fondo: #f9fbf9;
+$blanco: #ffffff;
+
+.container {
+  padding: 30px;
+  background-color: $verde-fondo;
+  min-height: 100vh;
+}
+
+.headerArea {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+
+  .headerTitle {
+    font-size: 24px;
+    font-weight: 700;
+    color: $verde-oscuro;
+  }
+}
+
+.loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+} 
+
+.header{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+
+  .headerTitle {
+    font-size: 24px;
+    font-weight: 700;
+    color: $verde-oscuro;
+  }
+}
+
+.fieldWrapper {
+  margin-bottom: 20px;
+}
+
+.personaName {
+  font-weight: 600;
+  color: $verde-oscuro;
+}
+
+.semaforoText {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+}
+
+.emptyText {
+  text-align: center;
+  color: #777;
+  font-size: 14px;
+  margin-top: 40px;
+}
+
+
+.formContainer {
+  background-color: $blanco;
+  padding: 30px;
+  border-radius: 16px;
+  margin-bottom: 40px;
+  box-shadow: 0 4px 12px rgba(0, 77, 64, 0.05);
+  border: 1px solid #e8eee8;
+
+  :global(.ms-Label) {
+    color: $verde-oscuro !important;
+    font-weight: 600;
+  }
+
+
+  :global(.ms-Dropdown-title), 
+  :global(.ms-TextField-fieldGroup),
+  :global(.ms-DatePicker-container) {
+    background-color: $blanco !important;
+    border-color: #d1d1d1 !important;
+    color: #333 !important;
+    border-radius: 4px;
+  }
+}
+
+
+.dropdownLarge { 
+  width: 280px; 
+}
+
+.datePicker { 
+  width: 200px; 
+}
+
+.btnAsignar {
+  background-color: $verde-oscuro;
+  border: none;
+  border-radius: 8px;
+  height: 32px;
+  &:hover { 
+    background-color: $verde-claro; 
+  }
+}
+
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 25px;
+}
+
+.obraCard {
+  background: $blanco;
+  border-radius: 16px;
+  border: 1px solid #edebe9;
+  padding: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  
+  .obraTitle {
+    font-weight: 700;
+    color: $verde-oscuro;
+    font-size: 18px;
+  }
+}
+
+.assignmentItem {
+  padding: 12px;
+  border-radius: 8px;
+  background-color: #f8faf8;
+  border-left: 4px solid transparent;
+  margin-bottom: 8px;
+
+  &.retrasado { border-left-color: #d13438; }
+  &.critico { border-left-color: #ffaa44; }
+  &.atiempo { border-left-color: $verde-claro; }
+}
+
+.statusBadge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.bgFinalizado { background: #e8f5e9; color: $verde-claro; }
+.bgActivo { background: #e3f2fd; color: #0078d4; }
+
+.deleteBtn {
+  color: #a19f9d;
+  &:hover { 
+    color: #d13438; 
+    background-color: #fff1f1; 
+  }
+}

@@ -1,0 +1,125 @@
+@import '~@fluentui/react/dist/sass/References.scss';
+
+$verde-ews: #004d40;
+$verde-claro: #8bc34a;
+$blanco: #ffffff;
+$gris-borde: #edebe9;
+$rojo-alerta: #d13438;
+
+
+.container {
+  padding: 20px;
+  background-color: #f4f4f4;
+  min-height: 100vh;
+
+  :global {
+    
+    .ms-TextField-fieldGroup::after,
+    .ms-Dropdown-container::after,
+    .ms-SearchBox::after {
+      border-color: $verde-ews;
+    }
+    
+    
+    .ms-DetailsHeader {
+      background-color: $verde-ews;
+      padding-top: 0;
+
+      .ms-DetailsHeader-cell {
+        color: $blanco;
+        background-color: $verde-ews;
+        font-weight: 700;
+
+        .ms-DetailsHeader-filterChevron, 
+        .ms-DetailsHeader-cellName {
+          color: $blanco;
+        }
+      }
+    }
+
+    .ms-DetailsRow {
+      border-bottom: 1px solid $gris-borde;
+      
+      
+      &:hover {
+        background-color: rgba($verde-claro, 0.1);
+        color: $verde-ews;
+        
+        .ms-DetailsRow-cell {
+          background-color: transparent;
+          color: $verde-ews;
+        }
+      }
+    }
+  }
+}
+
+.formCard {
+  background-color: $blanco;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 25px;
+  border-top: 4px solid $verde-ews;
+}
+
+.formTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  color: $verde-ews;
+  i { font-size: 24px; }
+}
+
+.gridForm {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.8fr 0.8fr 1fr;
+  gap: 15px;
+  align-items: end;
+
+  @media (max-width: 1024px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.btnAdd {
+  height: 32px;
+  background-color: $verde-ews;
+  border: none;
+  border-radius: 4px;
+  color: $blanco;
+  &:hover {
+    background-color: $verde-claro;
+  }
+}
+
+.searchSection {
+  margin: 15px 0;
+  width: 350px; 
+}
+
+.tableContainer {
+  background-color: $blanco;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border: 1px solid $gris-borde;
+}
+
+.stockCellAlerta {
+  color: $rojo-alerta;
+  font-weight: 700;
+}
+
+.stockCellNormal {
+  color: $verde-ews;
+  font-weight: 700;
+}
+
+.actionBtn { color: $verde-ews; }
+.deleteBtn { color: $rojo-alerta; }
+
+.panelStack {
+  margin-top: 20px;
+}
