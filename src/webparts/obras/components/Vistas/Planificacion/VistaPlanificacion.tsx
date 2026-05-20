@@ -89,22 +89,87 @@ export const VistaPlanificacion: React.FC<{ context: WebPartContext }> = ({ cont
 
   React.useEffect(() => { cargarDatos(); }, []);
 
+  // --- FUNCIÓN ONDROP MODIFICADA ---
   const onDrop = async (ev: React.DragEvent, obraId: number, indexDia: number) => {
     ev.preventDefault();
-    const personId = parseInt(ev.dataTransfer.getData("personId"));
+    
+    // Obtenemos qué tipo de elemento estamos arrastrando
+    const personIdStr = ev.dataTransfer.getData("personId"); // Viene del panel superior (nueva asignación)
+    const assignmentIdStr = ev.dataTransfer.getData("assignmentId"); // Viene de la tabla (mover asignación)
+    
     const fecha = getFechaPorDiaIndex(indexDia);
-    await services.asig.asignarPersonal({
-      ObraId: obraId,
-      PersonalId: personId,
-      FechaInicio: fecha,
-      FechaFinPrevista: fecha,
-      EstadoProgreso: 0,
-    });
-    await cargarDatos();
+    const fechaFormateada = fecha.toDateString();
+
+    // 1. SI ESTAMOS MOVIENDO UNA ASIGNACIÓN EXISTENTE
+    if (assignmentIdStr) {
+      const assignmentId = parseInt(assignmentIdStr, 10);
+      const asigToMove = asignaciones.find(a => a.Id === assignmentId);
+      
+      if (asigToMove) {
+        // Evitar hacer nada si lo sueltas exactamente en la misma celda de la que viene
+        if (asigToMove.ObraId === obraId && new Date(asigToMove.FechaInicio).toDateString() === fechaFormateada) {
+          return; 
+        }
+
+        // Comprobar que no esté ya duplicado en el destino
+        const isDuplicate = asignaciones.some(a => 
+          a.ObraId === obraId && 
+          new Date(a.FechaInicio).toDateString() === fechaFormateada && 
+          a.PersonalId === asigToMove.PersonalId &&
+          a.Id !== assignmentId // Excluimos la que estamos moviendo
+        );
+        
+        if (isDuplicate) {
+          alert("Este trabajador ya está asignado a esta obra ese mismo día.");
+          return;
+        }
+
+        setLoading(true);
+        // Simulamos un movimiento: Eliminamos la antigua y creamos la nueva en la nueva celda
+        await services.asig.eliminarAsignacion(assignmentId);
+        await services.asig.asignarPersonal({
+          ObraId: obraId,
+          PersonalId: asigToMove.PersonalId,
+          FechaInicio: fecha,
+          FechaFinPrevista: fecha,
+          EstadoProgreso: 0,
+        });
+        await cargarDatos();
+      }
+      return;
+    }
+
+    // 2. SI ESTAMOS CREANDO UNA NUEVA ASIGNACIÓN DESDE ARRIBA
+    if (personIdStr) {
+      const personId = parseInt(personIdStr, 10);
+
+      // Comprobar duplicados
+      const isDuplicate = asignaciones.some(a => 
+        a.ObraId === obraId && 
+        new Date(a.FechaInicio).toDateString() === fechaFormateada && 
+        a.PersonalId === personId
+      );
+
+      if (isDuplicate) {
+        alert("Este trabajador ya está asignado a esta obra ese mismo día.");
+        return;
+      }
+
+      setLoading(true);
+      await services.asig.asignarPersonal({
+        ObraId: obraId,
+        PersonalId: personId,
+        FechaInicio: fecha,
+        FechaFinPrevista: fecha,
+        EstadoProgreso: 0,
+      });
+      await cargarDatos();
+    }
   };
 
   const eliminarAsignacion = async () => {
     if (!selectedAsig?.asig.Id) return;
+    setLoading(true);
     await services.asig.eliminarAsignacion(selectedAsig.asig.Id);
     setSelectedAsig(null);
     await cargarDatos();
@@ -177,7 +242,15 @@ export const VistaPlanificacion: React.FC<{ context: WebPartContext }> = ({ cont
                           {asigsEnDia.map(a => {
                             const p = personalDisponible.find(pers => pers.Id === a.PersonalId);
                             return p ? (
-                              <div key={a.Id} onClick={() => setSelectedAsig({asig: a, persona: p})} className={styles.fotoAsignada}>
+                              <div 
+                                key={a.Id} 
+                                draggable 
+                                onDragStart={(e) => e.dataTransfer.setData("assignmentId", a.Id!.toString())} // <--- NUEVO: Enviar ID asignación para moverla
+                                onClick={() => setSelectedAsig({asig: a, persona: p})} 
+                                className={styles.fotoAsignada}
+                                style={{ cursor: 'grab' }}
+                                title="Arrastra para mover o haz clic para eliminar"
+                              >
                                 <Persona text={p.NombreyApellido} imageUrl={p.FotoPerfil} size={PersonaSize.size32} />
                               </div>
                             ) : null;
@@ -207,6 +280,26 @@ export const VistaPlanificacion: React.FC<{ context: WebPartContext }> = ({ cont
           </div>
         </div>
       </Stack>
+
+      {/* --- DIALOGO PARA ELIMINAR ASIGNACIÓN --- */}
+      <Dialog 
+        hidden={!selectedAsig} 
+        onDismiss={() => setSelectedAsig(null)} 
+        dialogContentProps={{ 
+          type: DialogType.normal, 
+          title: "Gestionar Asignación",
+          subText: selectedAsig ? `¿Estás seguro de que quieres eliminar la asignación de ${selectedAsig.persona.NombreyApellido} para este día?` : ""
+        }}
+      >
+        <DialogFooter>
+          <PrimaryButton 
+            onClick={eliminarAsignacion} 
+            text="Eliminar" 
+            style={{ backgroundColor: '#d13438', borderColor: '#d13438' }} // Botón en rojo para indicar borrado
+          />
+          <DefaultButton onClick={() => setSelectedAsig(null)} text="Cancelar" />
+        </DialogFooter>
+      </Dialog>
 
       <Dialog hidden={!showAddPending} onDismiss={() => setShowAddPending(false)} dialogContentProps={{ type: DialogType.normal, title: "Nueva Nota Pendiente" }}>
         <TextField label="Nombre" value={newPending.nombre} onChange={(_, v) => setNewPending({ ...newPending, nombre: v || "" })} />

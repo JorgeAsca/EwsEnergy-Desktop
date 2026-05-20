@@ -14,12 +14,32 @@ import {
     DatePicker,
     Separator,
     Icon,
+    IDatePickerStrings,
+    DayOfWeek
 } from "@fluentui/react";
 import { AsignacionesService } from "../../../service/AsignacionesService";
 import { IObra } from "../../../models/IObra";
 import { IPersonal } from "../../../models/IPersonal";
 import { IAsignacion } from "../../../models/IAsignacion";
 import styles from "./VistaAsignaciones.module.scss";
+
+// --- TEXTOS EN ESPAÑOL PARA EL CALENDARIO ---
+const stringsEspanol: IDatePickerStrings = {
+    months: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+    shortMonths: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+    days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+    shortDays: ['D', 'L', 'M', 'X', 'J', 'V', 'S'],
+    goToToday: 'Ir a hoy',
+    prevMonthAriaLabel: 'Mes anterior',
+    nextMonthAriaLabel: 'Mes siguiente',
+    prevYearAriaLabel: 'Año anterior',
+    nextYearAriaLabel: 'Año siguiente',
+    closeButtonAriaLabel: 'Cerrar',
+    monthPickerHeaderAriaLabel: '{0}, seleccione para cambiar el año',
+    yearPickerHeaderAriaLabel: '{0}, seleccione para cambiar el mes',
+    isRequiredErrorMessage: 'Este campo es obligatorio.',
+    invalidInputErrorMessage: 'Formato de fecha no válido.',
+};
 
 export const VistaAsignaciones: React.FC<{ context: any }> = (props) => {
     const [data, setData] = React.useState<{
@@ -124,6 +144,9 @@ export const VistaAsignaciones: React.FC<{ context: any }> = (props) => {
                         placeholder="¿Qué día asiste a la obra?"
                         value={seleccion.fechaFin}
                         onSelectDate={(date) => setSeleccion((prev) => ({ ...prev, fechaFin: date || new Date() }))}
+                        strings={stringsEspanol} // <--- TRADUCCIÓN APLICADA AQUÍ
+                        firstDayOfWeek={DayOfWeek.Monday} // <--- LA SEMANA EMPIEZA EN LUNES
+                        formatDate={(date) => date ? date.toLocaleDateString() : ''} // Formato local de fecha (ej: DD/MM/YYYY)
                     />
 
                     <PrimaryButton

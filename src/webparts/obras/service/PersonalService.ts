@@ -4,6 +4,7 @@ import { IPersonal } from '../models/IPersonal';
 export class PersonalService {
     private _context: any;
     private _listName: string = "Personal EWS";
+    private _libraryName: string = "Fotos_Personal"; // Nombre de la biblioteca donde guardaremos las fotos
 
     constructor(context: any) { this._context = context; }
 
@@ -31,51 +32,79 @@ export class PersonalService {
     }
 
     /**
-     * Obtiene los archivos de la biblioteca 'Fotos_Personal' para elegirlos en el formulario
+     * Convierte un string en Base64 a un ArrayBuffer, necesario para subir archivos a SharePoint
      */
-    public async getFotosDisponibles(): Promise<{ key: string, text: string, url: string }[]> {
-        try {
-            const serverRelativeUrl = `${this._context.pageContext.web.serverRelativeUrl}/Fotos_Personal`;
-            const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/getfolderbyserverrelativeurl('${serverRelativeUrl}')/files`;
+    private base64ToArrayBuffer(base64: string): ArrayBuffer {
+        const binary_string = window.atob(base64);
+        const len = binary_string.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binary_string.charCodeAt(i);
+        }
+        return bytes.buffer;
+    }
 
-            // Para listar archivos, odata=verbose suele ser más fiable y evita errores 406
-            const response = await this._context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1, {
+    /**
+     * Sube una imagen en formato Base64 a la biblioteca de SharePoint y retorna la URL
+     */
+    private async subirImagen(base64Data: string, nombreEmpleado: string): Promise<string> {
+        // Si no es un base64, asumimos que ya es una URL válida y la devolvemos tal cual
+        if (!base64Data.startsWith('data:image')) {
+            return base64Data;
+        }
+
+        try {
+            // Limpiamos el nombre para usarlo en el archivo y generamos un nombre único
+            const safeName = nombreEmpleado.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+            const fileName = `foto_${safeName}_${new Date().getTime()}.jpg`;
+
+            // Extraemos solo la parte del contenido base64 (quitamos el "data:image/jpeg;base64,")
+            const base64Content = base64Data.split(',')[1];
+            const buffer = this.base64ToArrayBuffer(base64Content);
+
+            const serverRelativeUrl = `${this._context.pageContext.web.serverRelativeUrl}/${this._libraryName}`;
+            const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/getfolderbyserverrelativeurl('${serverRelativeUrl}')/files/add(url='${fileName}',overwrite=true)`;
+
+            const response = await this._context.spHttpClient.post(endpoint, SPHttpClient.configurations.v1, {
                 headers: {
                     'Accept': 'application/json;odata=verbose',
+                    'Content-type': 'application/octet-stream', // Importante para archivos
                     'odata-version': ''
-                }
+                },
+                body: buffer
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error("Error al obtener archivos de la biblioteca:", errorText);
-                return [];
+                const err = await response.text();
+                console.error("Error al subir imagen:", err);
+                throw new Error("No se pudo subir la imagen a la biblioteca.");
             }
 
             const data = await response.json();
-            // Con odata=verbose, los datos están en d.results
-            const files = data.d && data.d.results ? data.d.results : [];
-
-            return files.map((file: any) => ({
-                key: `${window.location.origin}${file.ServerRelativeUrl}`,
-                text: file.Name,
-                url: `${window.location.origin}${file.ServerRelativeUrl}`
-            }));
+            // Retornamos la URL absoluta de la imagen recién subida
+            return `${window.location.origin}${data.d.ServerRelativeUrl}`;
         } catch (error) {
-            console.error("Error obteniendo fotos de la biblioteca:", error);
-            return [];
+            console.error("Error en subirImagen:", error);
+            throw error;
         }
     }
 
     public async crearTrabajador(nuevo: { NombreyApellido: string, Rol: string, FotoPerfil?: string }): Promise<void> {
+        let imageUrl = "";
+
+        // Si hay una foto seleccionada, la subimos primero
+        if (nuevo.FotoPerfil) {
+            imageUrl = await this.subirImagen(nuevo.FotoPerfil, nuevo.NombreyApellido);
+        }
+
         const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items`;
 
         const body: any = {
             Title: nuevo.NombreyApellido,
             Rol: nuevo.Rol,
-            FotoPerfil: nuevo.FotoPerfil ? {
+            FotoPerfil: imageUrl ? {
                 Description: nuevo.NombreyApellido,
-                Url: nuevo.FotoPerfil
+                Url: imageUrl
             } : null
         };
 
@@ -95,24 +124,23 @@ export class PersonalService {
         }
     }
 
-    public async getRolOptions(): Promise<string[]> {
-        const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/fields?$filter=EntityPropertyName eq 'Rol'`;
-        const response = await this._context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1);
-        if (!response.ok) return [];
-        const data = await response.json();
-        return (data.value && data.value[0]) ? data.value[0].Choices : [];
-    }
-
     public async actualizarTrabajador(id: number, datos: any): Promise<void> {
+        let imageUrl = datos.FotoPerfil;
+
+        // Si detectamos que la foto es un Base64 nuevo (el usuario eligió otra), la subimos
+        if (imageUrl && imageUrl.startsWith('data:image')) {
+            imageUrl = await this.subirImagen(imageUrl, datos.NombreyApellido);
+        }
+
         const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
         const body = JSON.stringify({
             '__metadata': { 'type': `SP.Data.Personal_x0020_EWSListItem` },
             Title: datos.NombreyApellido,
             Rol: datos.Rol,
-            FotoPerfil: datos.FotoPerfil ? {
+            FotoPerfil: imageUrl ? {
                 '__metadata': { 'type': 'SP.FieldUrlValue' },
                 'Description': datos.NombreyApellido,
-                'Url': datos.FotoPerfil
+                'Url': imageUrl
             } : null
         });
 
@@ -130,10 +158,16 @@ export class PersonalService {
         if (!response.ok) {
             const errorText = await response.text();
             console.error("Error detallado al actualizar:", errorText);
-
-            // Si el error persiste por el nombre del tipo, probaremos una versión más simplificada
             throw new Error("No se pudo actualizar el registro del trabajador.");
         }
+    }
+
+    public async getRolOptions(): Promise<string[]> {
+        const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/fields?$filter=EntityPropertyName eq 'Rol'`;
+        const response = await this._context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1);
+        if (!response.ok) return [];
+        const data = await response.json();
+        return (data.value && data.value[0]) ? data.value[0].Choices : [];
     }
 
     public async eliminarTrabajador(id: number): Promise<void> {

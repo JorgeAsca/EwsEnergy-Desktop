@@ -3,7 +3,8 @@ import {
   Stack, Text, Persona, PersonaSize, Spinner, SpinnerSize, MessageBar, 
   MessageBarType, PrimaryButton, DefaultButton, TextField, Dropdown, 
   IDropdownOption, Icon, Separator, IconButton, Shimmer,
-  ShimmerElementType, Dialog, DialogType, DialogFooter, Modal
+  ShimmerElementType, Dialog, DialogType, DialogFooter, Modal,
+  Label
 } from "@fluentui/react";
 import { PersonalService } from "../../../service/PersonalService";
 import { IPersonal } from "../../../models/IPersonal";
@@ -28,12 +29,14 @@ const PersonaShimmer = () => (
 export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
   const [empleados, setEmpleados] = React.useState<IPersonal[]>([]);
   const [rolOptions, setRolOptions] = React.useState<IDropdownOption[]>([]);
-  const [fotoOptions, setFotoOptions] = React.useState<IDropdownOption[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isOpen, setIsOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [editandoId, setEditandoId] = React.useState<number | null>(null);
   const [hideDeleteDialog, setHideDeleteDialog] = React.useState(true);
+
+  // Referencia para el input de archivo oculto
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [formulario, setFormulario] = React.useState({
     NombreyApellido: "",
@@ -46,14 +49,12 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      const [data, opciones, fotos] = await Promise.all([
+      const [data, opciones] = await Promise.all([
         service.getPersonal(),
-        service.getRolOptions(),
-        service.getFotosDisponibles()
+        service.getRolOptions()
       ]);
       setEmpleados(data || []);
       setRolOptions(opciones.map(opt => ({ key: opt, text: opt })));
-      setFotoOptions(fotos.map(f => ({ key: f.url, text: f.text })));
     } catch (err) {
       console.error("Error cargando datos:", err);
     } finally {
@@ -79,6 +80,19 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
     setEditandoId(null);
     setFormulario({ NombreyApellido: "", Rol: (rolOptions[0]?.key as string) || "", FotoPerfil: "" });
     setIsOpen(true);
+  };
+
+  // Manejador para cuando el usuario selecciona un archivo
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        // Guardamos el resultado en base64 en el estado
+        setFormulario({ ...formulario, FotoPerfil: reader.result as string });
+      };
+      reader.readAsDataURL(file); // Leemos el archivo local
+    }
   };
 
   const handleGuardar = async () => {
@@ -200,12 +214,30 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
               selectedKey={formulario.Rol}
               onChange={(_, opt) => setFormulario({ ...formulario, Rol: opt?.key as string })} 
             />
-            <Dropdown 
-              label="Fotografía"
-              options={fotoOptions}
-              selectedKey={formulario.FotoPerfil}
-              onChange={(_, opt) => setFormulario({ ...formulario, FotoPerfil: opt?.key as string })}
-            />
+            
+            {/* --- SECCIÓN DE FOTOGRAFÍA MODIFICADA --- */}
+            <div>
+              <Label>Fotografía de Perfil</Label>
+              <Stack horizontal verticalAlign="center" tokens={{ childrenGap: 10 }}>
+                <DefaultButton 
+                  text="Subir desde galería" 
+                  iconProps={{ iconName: 'Photo2' }}
+                  onClick={() => fileInputRef.current?.click()} 
+                />
+                <input 
+                  type="file" 
+                  accept="image/*" // Solo permite seleccionar imágenes
+                  ref={fileInputRef} 
+                  style={{ display: 'none' }} // Lo mantenemos oculto
+                  onChange={handleFileChange}
+                />
+                {formulario.FotoPerfil && (
+                  <Text variant="small" style={{ color: 'green' }}>
+                    ¡Imagen seleccionada!
+                  </Text>
+                )}
+              </Stack>
+            </div>
 
             {formulario.FotoPerfil && (
               <div className={styles.previewBox}>
@@ -241,6 +273,7 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
           </div>
         </div>
       </Modal>
+      
       <Dialog
         hidden={hideDeleteDialog}
         onDismiss={() => setHideDeleteDialog(true)}
