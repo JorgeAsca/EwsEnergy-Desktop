@@ -34,7 +34,7 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
   const [items, setItems] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [filterText, setFilterText] = React.useState("");
-  const [filterCategory, setFilterCategory] = React.useState<string>("Todas"); // <-- NUEVO ESTADO PARA CATEGORÍA
+  const [filterCategory, setFilterCategory] = React.useState<string>("Todas");
   const [isPanelOpen, setIsPanelOpen] = React.useState(false);
   const [selectedItem, setSelectedItem] = React.useState<any>(null);
   
@@ -43,6 +43,7 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
     stock: 0,
     stockMin: 0,
     cat: "Consumible",
+    ImagenPreview: "", // <-- Para previsualizar la imagen antes de subirla
     file: null as File | null
   });
 
@@ -64,26 +65,50 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
     cargarMateriales();
   }, []);
 
+  // --- MANEJADOR DE ARCHIVOS (IMÁGENES) ---
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, mode: 'nuevo' | 'edit') => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        if (mode === 'nuevo') {
+          setNuevo({ ...nuevo, ImagenPreview: base64, file: file });
+        } else {
+          setSelectedItem({ ...selectedItem, ImagenPreview: base64, file: file });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAdd = async () => {
     if (!nuevo.nombre) return;
     try {
+      setLoading(true);
+      // Le pasamos el objeto y el archivo (nuevo.file)
       await service.crearMaterial({
         Title: nuevo.nombre,
         StockActual: nuevo.stock,
         StockMinimo: nuevo.stockMin,
         Categoria: nuevo.cat
-      });
-      setNuevo({ nombre: "", stock: 0, stockMin: 0, cat: "Consumible", file: null });
-      cargarMateriales();
+      }, nuevo.file);
+      
+      setNuevo({ nombre: "", stock: 0, stockMin: 0, cat: "Consumible", ImagenPreview: "", file: null });
+      await cargarMateriales();
     } catch (e) {
       console.error(e);
+      alert("Error al crear el material. Revisa que los campos coincidan con SharePoint.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (id: number) => {
     if (confirm("¿Seguro que desea eliminar este registro?")) {
+      setLoading(true);
       await service.eliminarMaterial(id);
-      cargarMateriales();
+      await cargarMateriales();
     }
   };
 
@@ -91,22 +116,50 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
     if (!selectedItem) return;
     try {
       setLoading(true);
-      await service.actualizarMaterial(selectedItem.Id, {
+      // Le pasamos el ID, los datos actualizados y la posible nueva foto (selectedItem.file)
+      await service.editarMaterial(selectedItem.Id, {
         Title: selectedItem.Title,
         Categoria: selectedItem.Categoria,
         StockActual: selectedItem.StockActual,
         StockMinimo: selectedItem.StockMinimo
-      });
+      }, selectedItem.file || null);
+      
       setIsPanelOpen(false);
       await cargarMateriales();
     } catch (e) {
       console.error("Error al actualizar", e);
+      alert("Error al actualizar el material.");
     } finally {
       setLoading(false);
     }
   };
 
   const columns: IColumn[] = [
+    {
+      key: "col0",
+      name: "Foto",
+      minWidth: 50,
+      maxWidth: 50,
+      onRender: (item) => {
+        let fotoUrl = null;
+        if (item.AttachmentFiles && item.AttachmentFiles.length > 0) {
+            const adjunto = item.AttachmentFiles[0];
+            fotoUrl = adjunto.ServerRelativeUrl;
+            
+            // Reparación de ruta para testeo en entorno local (localhost)
+            if (fotoUrl && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+                const tenantUrl = props.context.pageContext.web.absoluteUrl.replace(props.context.pageContext.web.serverRelativeUrl, "");
+                fotoUrl = encodeURI(tenantUrl + fotoUrl);
+            }
+        }
+
+        return fotoUrl ? (
+          <img src={fotoUrl} alt={item.Title} className={styles.imageThumbnail} onError={(e) => e.currentTarget.style.display = 'none'} />
+        ) : (
+          <Icon iconName="Photo2" style={{ fontSize: '20px', color: '#c8c6c4' }} />
+        );
+      },
+    },
     {
       key: "col1",
       name: "Material",
@@ -181,6 +234,17 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
         </div>
         
         <div className={styles.gridForm}>
+          {/* FOTO */}
+          <Stack>
+            <Text variant="small" style={{ fontWeight: 600, paddingBottom: 6 }}>Imagen</Text>
+            <Stack horizontal tokens={{ childrenGap: 10 }} verticalAlign="center">
+              <div className={styles.imageUploadContainer} onClick={() => document.getElementById('file-nuevo')?.click()} title="Añadir foto">
+                {nuevo.ImagenPreview ? <img src={nuevo.ImagenPreview} alt="Preview" /> : <Icon iconName="Camera" />}
+              </div>
+              <input type="file" accept="image/*" id="file-nuevo" style={{ display: 'none' }} onChange={(e) => handleFileChange(e, 'nuevo')} />
+            </Stack>
+          </Stack>
+
           <TextField
             label="Nombre"
             value={nuevo.nombre}
@@ -210,6 +274,7 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
             iconProps={{ iconName: "Save" }}
             onClick={handleAdd}
             className={styles.btnAdd}
+            style={{ alignSelf: 'flex-end', marginBottom: '2px' }}
           />
         </div>
       </div>
@@ -254,7 +319,20 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
         type={PanelType.medium}
       >
         {selectedItem && (
-          <Stack gap={15} className={styles.panelStack}>
+          <Stack gap={15} className={styles.panelStack} style={{ marginTop: 20 }}>
+            {/* FOTO EDICIÓN */}
+            <Stack horizontalAlign="center">
+              <div className={styles.imageUploadContainer} style={{ width: '120px', height: '120px' }} onClick={() => document.getElementById('file-edit')?.click()}>
+                  {selectedItem.ImagenPreview || selectedItem.AttachmentFiles?.[0]?.ServerRelativeUrl ? (
+                      <img src={selectedItem.ImagenPreview || selectedItem.AttachmentFiles[0].ServerRelativeUrl} alt="Material" />
+                  ) : (
+                      <Icon iconName="Camera" style={{ fontSize: '30px' }} />
+                  )}
+              </div>
+              <input type="file" accept="image/*" id="file-edit" style={{ display: 'none' }} onChange={(e) => handleFileChange(e, 'edit')} />
+              <DefaultButton text="Cambiar Foto" onClick={() => document.getElementById('file-edit')?.click()} style={{ marginTop: '10px' }} />
+            </Stack>
+
             <TextField 
               label="Nombre" 
               value={selectedItem.Title} 
@@ -291,3 +369,5 @@ export const ListaMateriales: React.FC<{ context: any }> = (props) => {
     </div>
   );
 };
+
+export default ListaMateriales;

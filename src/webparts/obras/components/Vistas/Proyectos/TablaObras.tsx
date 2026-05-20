@@ -20,26 +20,51 @@ import {
   Modal,
   IconButton,
   DefaultButton,
+  IDatePickerStrings,
+  DayOfWeek,
+  Dialog,
+  DialogType,
+  DialogFooter
 } from "@fluentui/react";
 import { SPHttpClient } from "@microsoft/sp-http";
 import { ProjectService } from "../../../service/ProjectService";
 import { PersonalService } from "../../../service/PersonalService";
 import { AsignacionesService } from "../../../service/AsignacionesService";
+import { ClientesService } from "../../../service/ClientesService"; // <-- NUEVO IMPORT
 import { IObraCard } from "../../../models/IObraCard";
 import styles from "./TablaObras.module.scss";
 
-// ─── LEAFLET (instala con: npm install leaflet @types/leaflet) ───────────────
+// ─── LEAFLET ────────────────────────────────────────────────────────────────
 import L from "leaflet";
 // ────────────────────────────────────────────────────────────────────────────
 
+const stringsEspanol: IDatePickerStrings = {
+  months: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+  shortMonths: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+  days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  shortDays: ['D', 'L', 'M', 'X', 'J', 'V', 'S'],
+  goToToday: 'Ir a hoy',
+  prevMonthAriaLabel: 'Mes anterior',
+  nextMonthAriaLabel: 'Mes siguiente',
+  prevYearAriaLabel: 'Año anterior',
+  nextYearAriaLabel: 'Año siguiente',
+  closeButtonAriaLabel: 'Cerrar',
+  monthPickerHeaderAriaLabel: '{0}, seleccione para cambiar el año',
+  yearPickerHeaderAriaLabel: '{0}, seleccione para cambiar el mes',
+  isRequiredErrorMessage: 'Este campo es obligatorio.',
+  invalidInputErrorMessage: 'Formato de fecha no válido.',
+};
+
 export const TablaObras: React.FC<{ context: any }> = (props) => {
-  // --- ESTADOS DE DATOS ---
   const [obras, setObras] = React.useState<IObraCard[]>([]);
   const [clientes, setClientes] = React.useState<IDropdownOption[]>([]);
   const [obraSeleccionada, setObraSeleccionada] = React.useState<IObraCard | null>(null);
   const [fotosObra, setFotosObra] = React.useState<any[]>([]);
 
-  // --- ESTADOS DE CONTROL ---
+  // Estados locales para los archivos y fotos subidas visualmente
+  const [archivosLocales, setArchivosLocales] = React.useState<{ nombre: string; icono: string }[]>([]);
+  const [fotosPreviasLocales, setFotosPreviasLocales] = React.useState<string[]>([]);
+
   const [loading, setLoading] = React.useState(true);
   const [loadingFotos, setLoadingFotos] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -47,49 +72,52 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [obraEditandoId, setObraEditandoId] = React.useState<number | null>(null);
 
-  // --- ESTADO DE FORMULARIO ---
+  // --- ESTADOS NUEVOS PARA CREACIÓN EXPRÉS DE CLIENTES ---
+  const [isNuevoClienteOpen, setIsNuevoClienteOpen] = React.useState(false);
+  const [nuevoClienteNombre, setNuevoClienteNombre] = React.useState("");
+  const [creandoCliente, setCreandoCliente] = React.useState(false);
+
+  const inputArchivoRef = React.useRef<HTMLInputElement>(null);
+  const inputFotoRef = React.useRef<HTMLInputElement>(null);
+
   const [nuevaObra, setNuevaObra] = React.useState({
-    Nombre: "",
-    Descripcion: "",
-    ClienteId: 0,
-    Direccion: "",
-    FechaInicio: new Date(),
-    FechaFin: new Date(),
-    JornadasTotales: 30,
+    Nombre: "", Descripcion: "", ClienteId: 0, Direccion: "",
+    FechaInicio: new Date(), FechaFin: new Date(), JornadasTotales: 30,
   });
 
-  // --- REFS DEL MAPA ---
   const mapRef = React.useRef<HTMLDivElement>(null);
   const mapInstanceRef = React.useRef<L.Map | null>(null);
   const markerRef = React.useRef<L.Marker | null>(null);
 
-  // --- SERVICIOS MEMOIZADOS ---
   const services = React.useMemo(() => ({
     project: new ProjectService(props.context),
     personal: new PersonalService(props.context),
     asig: new AsignacionesService(props.context),
+    clientes: new ClientesService(props.context), // <-- NUEVA INSTANCIA
   }), [props.context]);
 
-  // --- CARGA CENTRALIZADA ---
+  // --- FUNCIÓN ASÍNCRONA EXCLUSIVA PARA ENLAZAR CLIENTES ---
+  const cargarClientes = async (): Promise<IDropdownOption[]> => {
+    try {
+      const dataClientes = await services.clientes.getClientes();
+      const opciones = dataClientes.map((c) => ({ key: c.Id!, text: c.Title }));
+      setClientes(opciones);
+      return opciones;
+    } catch (error) {
+      console.error("Error al refrescar listado de clientes:", error);
+      return [];
+    }
+  };
+
   const cargarTodo = async () => {
     try {
       setLoading(true);
-      const [listaObras, respClientes, listaAsignaciones, listaPersonal] = await Promise.all([
+      const [listaObras, listaAsignaciones, listaPersonal, opcionesClientes] = await Promise.all([
         services.project.getObras(),
-        props.context.spHttpClient.get(
-          `${props.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Clientes')/items?$select=Id,Title`,
-          SPHttpClient.configurations.v1
-        ),
         services.asig.getAsignaciones(),
         services.personal.getPersonal(),
+        cargarClientes() // Cargamos los clientes usando el método unificado
       ]);
-
-      let opcionesClientes: IDropdownOption[] = [];
-      if (respClientes.ok) {
-        const dataC = await respClientes.json();
-        opcionesClientes = (dataC.value || []).map((c: any) => ({ key: c.Id, text: c.Title }));
-        setClientes(opcionesClientes);
-      }
 
       const obrasProcesadas: IObraCard[] = listaObras.map((o) => {
         const porcentajeReal = (o.ProgresoReal || 0) / 100;
@@ -97,10 +125,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         const operariosAsignados = Array.from(new Set(asigsObra.map(a => Number(a.PersonalId))))
           .map(pid => {
             const pers = (listaPersonal as any[]).find(p => Number(p.Id) === pid);
-            return {
-              personaName: pers?.NombreyApellido || "Operario",
-              imageUrl: pers?.FotoPerfil || "",
-            };
+            return { personaName: pers?.NombreyApellido || "Operario", imageUrl: pers?.FotoPerfil || "" };
           });
         return {
           ...o,
@@ -118,21 +143,43 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       }
     } catch (e) {
       console.error("Error en Dashboard:", e);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   React.useEffect(() => { cargarTodo(); }, []);
 
-  // ─── INICIALIZAR MAPA AL ABRIR MODAL ──────────────────────────────────────
+  // --- MANEJADOR DE ALTA EXPRÉS DE CLIENTES ---
+  const handleCrearClienteRapido = async () => {
+    if (!nuevoClienteNombre.trim()) return;
+    try {
+      setCreandoCliente(true);
+      // Creamos el cliente en la lista
+      await services.clientes.crearCliente({ Title: nuevoClienteNombre });
+      
+      // Refrescamos las opciones del dropdown
+      const nuevasOpciones = await cargarClientes();
+      
+      // Buscamos el cliente creado para dejarlo auto-seleccionado al instante
+      const clienteCreado = nuevasOpciones.find(c => c.text.toLowerCase() === nuevoClienteNombre.trim().toLowerCase());
+      if (clienteCreado) {
+        setNuevaObra(prev => ({ ...prev, ClienteId: clienteCreado.key as number }));
+      }
+
+      setIsNuevoClienteOpen(false);
+      setNuevoClienteNombre("");
+    } catch (e) {
+      alert("Error al dar de alta al cliente exprés.");
+    } finally {
+      setCreandoCliente(false);
+    }
+  };
+
+  // ─── INICIALIZAR MAPA ───────────────────────────────────────────────────────
   React.useEffect(() => {
     if (!isOpen) return;
-
     const timer = setTimeout(() => {
       if (!mapRef.current || mapInstanceRef.current) return;
 
-      // 1. Cargar CSS de Leaflet dinámicamente (compatible con SPFx)
       if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link");
         link.id = "leaflet-css";
@@ -141,7 +188,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         document.head.appendChild(link);
       }
 
-      // 2. Fix icono por defecto de Leaflet con webpack
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -149,29 +195,31 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       });
 
-      const map = L.map(mapRef.current).setView([40.416775, -3.70379], 6);
+      const map = L.map(mapRef.current, {
+        tap: false,
+        dragging: true 
+      } as L.MapOptions).setView([40.416775, -3.70379], 6);
+
+      if (mapRef.current) {
+        L.DomEvent.disableClickPropagation(mapRef.current);
+        L.DomEvent.disableScrollPropagation(mapRef.current);
+      }
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
+        attribution: '© OpenStreetMap', maxZoom: 19,
       }).addTo(map);
 
-      // 3. invalidateSize soluciona los tiles rotos cuando el mapa
-      //    se inicializa dentro de un modal (contenedor oculto inicialmente)
       setTimeout(() => map.invalidateSize(), 100);
 
-      // 4. Clic en el mapa para colocar/mover marcador
       map.on("click", (e: L.LeafletMouseEvent) => {
         const { lat, lng } = e.latlng;
-        if (markerRef.current) {
-          markerRef.current.setLatLng([lat, lng]);
-        } else {
-          markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(map);
-        }
+        if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
+        else markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(map);
       });
 
       mapInstanceRef.current = map;
-    }, 400); // un poco más de delay para que el modal termine de animarse
-
+    }, 400); 
+    
     return () => {
       clearTimeout(timer);
       if (mapInstanceRef.current) {
@@ -182,114 +230,105 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     };
   }, [isOpen]);
 
-  // ─── GEOCODIFICACIÓN AUTOMÁTICA AL ESCRIBIR DIRECCIÓN ─────────────────────
   React.useEffect(() => {
     if (!nuevaObra.Direccion || nuevaObra.Direccion.length < 5) return;
-
     const debounce = setTimeout(async () => {
       try {
-        const resp = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nuevaObra.Direccion)}&limit=1`,
-          { headers: { "Accept-Language": "es" } }
-        );
+        const resp = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nuevaObra.Direccion)}&limit=1`, { headers: { "Accept-Language": "es" } });
         const data = await resp.json();
-
         if (data.length > 0 && mapInstanceRef.current) {
-          const lat = parseFloat(data[0].lat);
-          const lon = parseFloat(data[0].lon);
-          const coords: L.LatLngExpression = [lat, lon];
-
-          // Volar suavemente a la ubicación
+          const coords: L.LatLngExpression = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
           mapInstanceRef.current.flyTo(coords, 16, { animate: true, duration: 1.2 });
-
-          // Actualizar o crear marcador draggable
-          if (markerRef.current) {
-            markerRef.current.setLatLng(coords);
-          } else {
-            markerRef.current = L.marker(coords, { draggable: true }).addTo(mapInstanceRef.current);
-          }
-
-          markerRef.current
-            .bindPopup(`<b>📍 ${nuevaObra.Direccion}</b>`)
-            .openPopup();
+          if (markerRef.current) markerRef.current.setLatLng(coords);
+          else markerRef.current = L.marker(coords, { draggable: true }).addTo(mapInstanceRef.current);
+          markerRef.current.bindPopup(`<b>📍 ${nuevaObra.Direccion}</b>`).openPopup();
         }
-      } catch (e) {
-        console.warn("Error geocodificando:", e);
-      }
+      } catch (e) { console.warn("Error geocodificando:", e); }
     }, 800);
-
     return () => clearTimeout(debounce);
   }, [nuevaObra.Direccion]);
-  // ──────────────────────────────────────────────────────────────────────────
 
   // --- MANEJADORES ---
   const verDetallesObra = async (obra: IObraCard) => {
     setObraSeleccionada(obra);
     setLoadingFotos(true);
+    setArchivosLocales([]); 
+    setFotosPreviasLocales([]);
     try {
       const fotos = await services.project.getFotosPorObra(obra.Id as number);
       setFotosObra(fotos || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingFotos(false);
+    } catch (e) { console.error(e); } 
+    finally { setLoadingFotos(false); }
+  };
+
+  const handleSubirPlano = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      let icono = "Document";
+      if (file.name.endsWith(".pdf")) icono = "PDF";
+      if (file.name.endsWith(".dwg")) icono = "VisioDocument";
+      if (file.name.endsWith(".xlsx")) icono = "ExcelDocument";
+      setArchivosLocales(prev => [...prev, { nombre: file.name, icono }]);
+      if (inputArchivoRef.current) inputArchivoRef.current.value = ""; 
     }
+  };
+
+  const handleSubirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFotosPreviasLocales(prev => [...prev, reader.result as string]);
+        if (inputFotoRef.current) inputFotoRef.current.value = ""; 
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const eliminarArchivoLocal = (index: number) => {
+    setArchivosLocales(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const eliminarFotoLocal = (index: number) => {
+    setFotosPreviasLocales(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleGuardar = async () => {
     if (!nuevaObra.Nombre || !nuevaObra.ClienteId) return;
     try {
       setSaving(true);
-      if (obraEditandoId) {
-        await services.project.updateObra(obraEditandoId, nuevaObra);
-      } else {
-        await services.project.crearObra(nuevaObra);
-      }
+      if (obraEditandoId) await services.project.updateObra(obraEditandoId, nuevaObra);
+      else await services.project.crearObra(nuevaObra);
       setIsOpen(false);
       resetForm();
       await cargarTodo();
-    } catch (e) {
-      alert("Error al guardar los cambios.");
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { alert("Error al guardar."); } 
+    finally { setSaving(false); }
   };
 
   const resetForm = () => {
     setObraEditandoId(null);
-    setNuevaObra({
-      Nombre: "", Descripcion: "", ClienteId: 0, Direccion: "",
-      FechaInicio: new Date(), FechaFin: new Date(), JornadasTotales: 30,
-    });
+    setNuevaObra({ Nombre: "", Descripcion: "", ClienteId: 0, Direccion: "", FechaInicio: new Date(), FechaFin: new Date(), JornadasTotales: 30 });
   };
 
   const handleAccionObra = async (id: number, accion: "finalizar" | "cancelar" | "eliminar") => {
-    const confirmacion = {
-      finalizar: "¿Estás seguro de finalizar esta obra?",
-      cancelar: "¿Deseas cancelar esta obra? No aparecerá activa.",
-      eliminar: "⚠️ ¿ESTÁS SEGURO? Se borrarán todos los registros permanentemente.",
-    };
+    const confirmacion = { finalizar: "¿Estás seguro de finalizar esta obra?", cancelar: "¿Deseas cancelar esta obra?", eliminar: "⚠️ ¿ESTÁS SEGURO? Se borrarán todos los registros permanentemente." };
     if (!window.confirm(confirmacion[accion])) return;
     try {
       setIsProcessing(true);
       if (accion === "finalizar") await services.project.finalizarObra(id);
       if (accion === "cancelar") await services.project.cancelarObra(id);
       if (accion === "eliminar") {
-        const endpoint = `${props.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Proyectos y Obras')/items(${id})`;
-        await props.context.spHttpClient.post(endpoint, SPHttpClient.configurations.v1, {
+        await props.context.spHttpClient.post(`${props.context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Proyectos y Obras')/items(${id})`, SPHttpClient.configurations.v1, {
           headers: { Accept: "application/json", "IF-MATCH": "*", "X-HTTP-Method": "DELETE" },
         });
       }
       setObraSeleccionada(null);
       await cargarTodo();
-    } catch (e) {
-      console.error(`Error en ${accion}:`, e);
-    } finally {
-      setIsProcessing(false);
-    }
+    } catch (e) { console.error(e); } 
+    finally { setIsProcessing(false); }
   };
 
-  // --- RENDERIZADO AUXILIAR ---
   const renderProgressTracker = (pReal: number) => {
     const totalBoxes = 10;
     const filledBoxes = Math.round(pReal * totalBoxes);
@@ -309,8 +348,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     return acc;
   }, {} as Record<string, IObraCard[]>);
 
-  if (loading && obras.length === 0)
-    return <Spinner size={SpinnerSize.large} label="Sincronizando Dashboard EWS..." />;
+  if (loading && obras.length === 0) return <Spinner size={SpinnerSize.large} label="Sincronizando Dashboard EWS..." />;
 
   return (
     <div className={styles.container}>
@@ -320,30 +358,19 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           <Text variant="xxLarge" className={styles.tituloPrincipal}>Panel de Control de Obras</Text>
           <Text variant="small" className={styles.subtituloHeader}>Gestión y seguimiento EWS Energy</Text>
         </Stack>
-        <PrimaryButton
-          iconProps={{ iconName: "Add" }}
-          text="Nueva Obra"
-          onClick={() => { resetForm(); setIsOpen(true); }}
-          className={styles.btnNuevaObra}
-        />
+        <PrimaryButton iconProps={{ iconName: "Add" }} text="Nueva Obra" onClick={() => { resetForm(); setIsOpen(true); }} className={styles.btnNuevaObra} />
       </div>
 
       <div className={styles.splitLayout}>
-        {/* COLUMNA IZQUIERDA: LISTADO */}
+        {/* COLUMNA IZQUIERDA */}
         <div className={styles.listColumn}>
           <div className={styles.listContainer}>
-            {Object.keys(obrasAgrupadas).length === 0 && (
-              <MessageBar>No hay proyectos registrados.</MessageBar>
-            )}
+            {Object.keys(obrasAgrupadas).length === 0 && <MessageBar>No hay proyectos registrados.</MessageBar>}
             {Object.keys(obrasAgrupadas).map((estado) => (
               <div key={estado}>
                 <Text className={styles.listGroupHeader}>{estado}</Text>
                 {obrasAgrupadas[estado].map((o) => (
-                  <div
-                    key={o.Id}
-                    className={`${styles.listItem} ${obraSeleccionada?.Id === o.Id ? styles.selected : ""}`}
-                    onClick={() => verDetallesObra(o)}
-                  >
+                  <div key={o.Id} className={`${styles.listItem} ${obraSeleccionada?.Id === o.Id ? styles.selected : ""}`} onClick={() => verDetallesObra(o)}>
                     <Text className={styles.obraTitle}>{o.Title}</Text>
                     {renderProgressTracker(o.porcentajeReal)}
                   </div>
@@ -362,73 +389,87 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                   <Text variant="xLarge" className={styles.detailTitle}>{obraSeleccionada.Title}</Text>
                   <Text variant="small" style={{ color: "#666" }}>{obraSeleccionada.clienteNombre}</Text>
                 </Stack>
-                <div className={`${styles.badgeEstado} ${
-                  obraSeleccionada.EstadoObra === "Finalizado" ? styles.finalizado
-                  : obraSeleccionada.EstadoObra === "Cancelado" ? styles.cancelado
-                  : styles.activo
-                }`}>
+                <div className={`${styles.badgeEstado} ${obraSeleccionada.EstadoObra === "Finalizado" ? styles.finalizado : obraSeleccionada.EstadoObra === "Cancelado" ? styles.cancelado : styles.activo}`}>
                   {obraSeleccionada.EstadoObra || "Fase Previa"}
                 </div>
-                <DefaultButton
-                  iconProps={{ iconName: "Edit" }}
-                  text="Editar"
-                  onClick={() => {
-                    setObraEditandoId(obraSeleccionada.Id as number);
-                    setNuevaObra({
-                      Nombre: obraSeleccionada.Title,
-                      Descripcion: obraSeleccionada.Descripcion || "",
-                      ClienteId: (clientes.find(c => c.text === obraSeleccionada.clienteNombre)?.key as number) || 0,
-                      Direccion: obraSeleccionada.DireccionObra || "",
-                      FechaInicio: new Date(obraSeleccionada.FechaInicio || Date.now()),
-                      FechaFin: new Date(obraSeleccionada.FechaFinPrevista || Date.now()),
-                      JornadasTotales: obraSeleccionada.JornadasTotales || 30,
-                    });
-                    setIsOpen(true);
-                  }}
-                />
+                <DefaultButton iconProps={{ iconName: "Edit" }} text="Editar" onClick={() => {
+                  setObraEditandoId(obraSeleccionada.Id as number);
+                  setNuevaObra({ Nombre: obraSeleccionada.Title, Descripcion: obraSeleccionada.Descripcion || "", ClienteId: (clientes.find(c => c.text === obraSeleccionada.clienteNombre)?.key as number) || 0, Direccion: obraSeleccionada.DireccionObra || "", FechaInicio: new Date(obraSeleccionada.FechaInicio || Date.now()), FechaFin: new Date(obraSeleccionada.FechaFinPrevista || Date.now()), JornadasTotales: obraSeleccionada.JornadasTotales || 30 });
+                  setIsOpen(true);
+                }} />
               </Stack>
-
               <Separator />
-
               <Stack horizontal tokens={{ childrenGap: 40 }} className={styles.infoSection}>
-                <Stack>
-                  <Text className={styles.labelSeccion}>Dirección</Text>
-                  <Text><Icon iconName="MapPin" className={styles.iconVerde} /> {obraSeleccionada.DireccionObra || "Sin dirección"}</Text>
-                </Stack>
-                <Stack>
-                  <Text className={styles.labelSeccion}>Jornadas Consumidas</Text>
-                  <Text><Icon iconName="Calendar" className={styles.iconVerde} /> {obraSeleccionada.jornadasConsumidas} / {obraSeleccionada.JornadasTotales || 30}</Text>
-                </Stack>
-                <Stack>
-                  <Text className={styles.labelSeccion}>Avance Físico</Text>
-                  <Text><Icon iconName="CompletedSolid" className={styles.iconVerde} /> {(obraSeleccionada.porcentajeReal * 100).toFixed(0)}% Ejecutado</Text>
-                </Stack>
-                <Stack>
-                  <Text className={styles.labelSeccion}>Equipo en Campo</Text>
-                  {obraSeleccionada.operarios?.length > 0 ? (
-                    <Facepile personas={obraSeleccionada.operarios} personaSize={PersonaSize.size32} />
-                  ) : (
-                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>Sin personal asignado</Text>
-                  )}
+                <Stack><Text className={styles.labelSeccion}>Dirección</Text><Text><Icon iconName="MapPin" className={styles.iconVerde} /> {obraSeleccionada.DireccionObra || "Sin dirección"}</Text></Stack>
+                <Stack><Text className={styles.labelSeccion}>Jornadas Consumidas</Text><Text><Icon iconName="Calendar" className={styles.iconVerde} /> {obraSeleccionada.jornadasConsumidas} / {obraSeleccionada.JornadasTotales || 30}</Text></Stack>
+                <Stack><Text className={styles.labelSeccion}>Avance Físico</Text><Text><Icon iconName="CompletedSolid" className={styles.iconVerde} /> {(obraSeleccionada.porcentajeReal * 100).toFixed(0)}% Ejecutado</Text></Stack>
+                <Stack><Text className={styles.labelSeccion}>Equipo en Campo</Text>
+                  {obraSeleccionada.operarios?.length > 0 ? <Facepile personas={obraSeleccionada.operarios} personaSize={PersonaSize.size32} /> : <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>Sin personal</Text>}
                 </Stack>
               </Stack>
 
+              {/* ── PLANOS Y ARCHIVOS LOCALES ───────────────────────────── */}
               <div className={styles.planosSection}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Planos y Documentación</Text>
-                  <DefaultButton iconProps={{ iconName: "Upload" }} className={styles.btnUpload}>Añadir Archivo</DefaultButton>
+                  <DefaultButton iconProps={{ iconName: "Upload" }} className={styles.btnUpload} onClick={() => inputArchivoRef.current?.click()}>Añadir Archivo</DefaultButton>
+                  <input type="file" ref={inputArchivoRef} style={{ display: "none" }} onChange={handleSubirPlano} />
                 </Stack>
+                
                 <Stack horizontal tokens={{ childrenGap: 15 }} wrap>
-                  <div className={styles.planoCard}><Icon iconName="PDF" className={styles.pdfIcon} /><Text variant="smallPlus">Esquema_Eléctrico_v2.pdf</Text></div>
-                  <div className={styles.planoCard}><Icon iconName="VisioDocument" className={styles.dwgIcon} /><Text variant="smallPlus">Topografía_Terreno.dwg</Text></div>
+                  {/* Renderizamos solo los archivos reales que suba el usuario */}
+                  {archivosLocales.length > 0 ? (
+                    archivosLocales.map((archivo, idx) => (
+                      <div key={idx} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px' }}>
+                        <Icon iconName={archivo.icono} className={archivo.icono === 'PDF' ? styles.pdfIcon : styles.dwgIcon} />
+                        <Text variant="smallPlus">{archivo.nombre}</Text>
+                        <IconButton
+                          iconProps={{ iconName: "Cancel" }}
+                          title="Eliminar archivo"
+                          onClick={() => eliminarArchivoLocal(idx)}
+                          styles={{ root: { position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24 } }}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay documentos adjuntos en esta obra.</Text>
+                  )}
                 </Stack>
+              </div>
+
+              {/* ── FOTOS PREVIAS/FINALES LOCALES ───────────────────────────── */}
+              <div className={styles.planosSection} style={{ marginTop: 20 }}>
+                <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
+                  <Text variant="large" className={styles.sectionTitle}>Fotografías Previas / Finales</Text>
+                  <DefaultButton iconProps={{ iconName: "Camera" }} className={styles.btnUpload} onClick={() => inputFotoRef.current?.click()}>Añadir Foto</DefaultButton>
+                  <input type="file" accept="image/*" ref={inputFotoRef} style={{ display: "none" }} onChange={handleSubirFoto} />
+                </Stack>
+
+                {fotosPreviasLocales.length > 0 ? (
+                  <Stack horizontal tokens={{ childrenGap: 10 }} wrap>
+                    {fotosPreviasLocales.map((fotoUrl, idx) => (
+                      <div key={idx} style={{ position: "relative", display: "inline-block" }}>
+                        <Image src={fotoUrl} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '1px solid #ccc' }} />
+                        <IconButton
+                          iconProps={{ iconName: "Cancel" }}
+                          title="Eliminar foto"
+                          onClick={() => eliminarFotoLocal(idx)}
+                          styles={{
+                            root: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: '50%', width: 24, height: 24 },
+                            icon: { fontSize: 12, color: '#d13438', fontWeight: 'bold' }
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </Stack>
+                ) : (
+                  <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay fotos previas cargadas.</Text>
+                )}
               </div>
 
               <div className={styles.historialSection}>
                 <Text variant="large" className={styles.sectionTitle}>Reportes de Jornada</Text>
-                {loadingFotos ? (
-                  <Spinner size={SpinnerSize.large} label="Cargando reportes..." />
-                ) : fotosObra.length > 0 ? (
+                {loadingFotos ? <Spinner size={SpinnerSize.large} label="Cargando reportes..." /> : fotosObra.length > 0 ? (
                   <Stack tokens={{ childrenGap: 15 }} styles={{ root: { marginTop: 15 } }}>
                     {fotosObra.map((f, i) => (
                       <div key={i} className={styles.fotoCard}>
@@ -436,17 +477,13 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                           <Image src={f.UrlFoto?.Url} width={120} height={90} imageFit={ImageFit.cover} className={styles.fotoThumb} />
                           <Stack>
                             <Text className={styles.fotoFecha}>📅 {new Date(f.FechaRegistro).toLocaleDateString()} - Worker {f.Operario}</Text>
-                            <div className={styles.fotoComentarioBox}>
-                              <Text className={styles.fotoComentarioText}>"{f.Comentarios || "Sin observaciones técnicas"}"</Text>
-                            </div>
+                            <div className={styles.fotoComentarioBox}><Text className={styles.fotoComentarioText}>"{f.Comentarios || "Sin observaciones técnicas"}"</Text></div>
                           </Stack>
                         </Stack>
                       </div>
                     ))}
                   </Stack>
-                ) : (
-                  <MessageBar messageBarType={MessageBarType.info}>No hay reportes para esta obra.</MessageBar>
-                )}
+                ) : <MessageBar messageBarType={MessageBarType.info}>No hay reportes diarios para esta obra.</MessageBar>}
               </div>
 
               <div className={styles.planosSection}>
@@ -456,23 +493,9 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                   <Stack horizontal tokens={{ childrenGap: 12 }} verticalAlign="center">
                     {isProcessing ? <Spinner label="Procesando..." /> : (
                       <>
-                        <PrimaryButton
-                          text="Finalizar Obra"
-                          iconProps={{ iconName: "Completed" }}
-                          onClick={() => handleAccionObra(obraSeleccionada.Id, "finalizar")}
-                          className={styles.btnNuevaObra}
-                        />
-                        <DefaultButton
-                          text="Cancelar Obra"
-                          iconProps={{ iconName: "Clear" }}
-                          onClick={() => handleAccionObra(obraSeleccionada.Id, "cancelar")}
-                        />
-                        <IconButton
-                          iconProps={{ iconName: "Delete" }}
-                          title="Eliminar Obra"
-                          onClick={() => handleAccionObra(obraSeleccionada.Id, "eliminar")}
-                          className={styles.btnClose}
-                        />
+                        <PrimaryButton text="Finalizar Obra" iconProps={{ iconName: "Completed" }} onClick={() => handleAccionObra(obraSeleccionada.Id, "finalizar")} className={styles.btnNuevaObra} />
+                        <DefaultButton text="Cancelar Obra" iconProps={{ iconName: "Clear" }} onClick={() => handleAccionObra(obraSeleccionada.Id, "cancelar")} />
+                        <IconButton iconProps={{ iconName: "Delete" }} title="Eliminar Obra" onClick={() => handleAccionObra(obraSeleccionada.Id, "eliminar")} className={styles.btnClose} />
                       </>
                     )}
                   </Stack>
@@ -489,67 +512,52 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         </div>
       </div>
 
-      {/* ── MODAL DE CREACIÓN / EDICIÓN ───────────────────────────────────────── */}
-      <Modal isOpen={isOpen} onDismiss={() => setIsOpen(false)} containerClassName={styles.modalContainer}>
+      <Modal 
+        isOpen={isOpen} 
+        onDismiss={() => setIsOpen(false)} 
+        containerClassName={styles.modalContainer}
+        allowTouchBodyScroll={true} 
+        layerProps={{ eventBubblingEnabled: true }} 
+      >
         <div className={styles.modalContent}>
-
-          {/* Cabecera */}
           <div className={styles.modalHeader}>
-            <Text variant="large" className={styles.modalTitle}>
-              {obraEditandoId ? "🔧 Modificar Parámetros de Obra" : "🚀 Lanzamiento de Nuevo Frente de Obra"}
-            </Text>
-            <IconButton
-              iconProps={{ iconName: "Cancel" }}
-              className={styles.btnClose}
-              onClick={() => setIsOpen(false)}
-            />
+            <Text variant="large" className={styles.modalTitle}>{obraEditandoId ? "🔧 Modificar Parámetros de Obra" : "🚀 Lanzamiento de Nuevo Frente de Obra"}</Text>
+            <IconButton iconProps={{ iconName: "Cancel" }} className={styles.btnClose} onClick={() => setIsOpen(false)} />
           </div>
-
           <Separator className={styles.modalSeparator} />
-
-          {/* Cuerpo */}
           <div className={styles.modalBody}>
             <Stack tokens={{ childrenGap: 15 }}>
+              <TextField label="Nombre del Proyecto / Frente" required value={nuevaObra.Nombre} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Nombre: v || "" })} />
+              
+              {/* ── SECCIÓN MODIFICADA: SELECCIÓN Y ALTA EXPRÉS DE CLIENTES ── */}
+              <Stack horizontal verticalAlign="end" tokens={{ childrenGap: 8 }}>
+                <Stack.Item grow={1}>
+                  <Dropdown 
+                    label="Cliente" 
+                    required 
+                    options={clientes} 
+                    selectedKey={nuevaObra.ClienteId || null} 
+                    placeholder="Selecciona un cliente..."
+                    onChange={(_, opt) => setNuevaObra({ ...nuevaObra, ClienteId: opt?.key as number })} 
+                  />
+                </Stack.Item>
+                <IconButton 
+                  iconProps={{ iconName: "Add" }} 
+                  title="Crear nuevo cliente sobre la marcha" 
+                  onClick={() => setIsNuevoClienteOpen(true)}
+                  styles={{ root: { marginBottom: '2px', backgroundColor: '#f3f2f1', borderRadius: '4px', height: 32, width: 32 } }}
+                />
+              </Stack>
+              {/* ────────────────────────────────────────────────────────────── */}
 
-              <TextField
-                label="Nombre del Proyecto / Frente"
-                required
-                value={nuevaObra.Nombre}
-                onChange={(_, v) => setNuevaObra({ ...nuevaObra, Nombre: v || "" })}
-                placeholder="Ej: Instalación Fotovoltaica Sector Norte"
-              />
-
-              <Dropdown
-                label="Cliente"
-                required
-                options={clientes}
-                selectedKey={nuevaObra.ClienteId || null}
-                placeholder="Selecciona un cliente..."
-                onChange={(_, opt) => setNuevaObra({ ...nuevaObra, ClienteId: opt?.key as number })}
-              />
-
-              <TextField
-                label="Dirección de Obra"
-                value={nuevaObra.Direccion}
-                onChange={(_, v) => setNuevaObra({ ...nuevaObra, Direccion: v || "" })}
-                placeholder="Ej: Calle Mayor 1, Madrid"
-                prefix="📍"
-              />
-
-              {/* ── MAPA INTERACTIVO ─────────────────────────────────────────── */}
+              <TextField label="Dirección de Obra" value={nuevaObra.Direccion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Direccion: v || "" })} prefix="📍" />
+              
+              {/* ── MAPA INTERACTIVO COMPLETAMENTE LIMPIO ────────────────────── */}
               <div>
                 <div
                   ref={mapRef}
-                  style={{
-                    width: "100%",
-                    height: "150px",
-                    borderRadius: "8px",
-                    border: "1px solid #ddd",
-                    overflow: "hidden",
-                    marginTop: "4px",
-                    position: "relative",
-                    zIndex: 0,
-                  }}
+                  data-is-scrollable="true" 
+                  style={{ width: "100%", height: "150px", borderRadius: "8px", border: "1px solid #ddd", overflow: "hidden", marginTop: "4px", position: "relative", zIndex: 1 }}
                 />
                 <Text variant="xSmall" style={{ color: "#aaa", marginTop: "3px", display: "block" }}>
                   📌 El mapa se centra al escribir la dirección · Clic para mover el marcador
@@ -558,60 +566,54 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
               {/* ────────────────────────────────────────────────────────────── */}
 
               <Stack horizontal tokens={{ childrenGap: 20 }}>
-                <DatePicker
-                  label="Fecha Inicio"
-                  value={nuevaObra.FechaInicio}
-                  onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })}
-                  styles={{ root: { flex: 1 } }}
-                />
-                <DatePicker
-                  label="Fecha Fin Prevista"
-                  value={nuevaObra.FechaFin}
-                  onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaFin: d || new Date() })}
-                  styles={{ root: { flex: 1 } }}
-                />
+                <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
+                <DatePicker label="Fecha Fin Prevista" value={nuevaObra.FechaFin} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaFin: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
               </Stack>
-
-              <TextField
-                label="Jornadas Presupuestadas"
-                type="number"
-                required
-                value={nuevaObra.JornadasTotales.toString()}
-                onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })}
-              />
-
-              <TextField
-                label="Descripción"
-                multiline
-                rows={3}
-                value={nuevaObra.Descripcion}
-                onChange={(_, v) => setNuevaObra({ ...nuevaObra, Descripcion: v || "" })}
-                placeholder="Descripción breve de los trabajos a realizar..."
-              />
-
+              <TextField label="Jornadas Presupuestadas" type="number" required value={nuevaObra.JornadasTotales.toString()} onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} />
+              <TextField label="Descripción" multiline rows={3} value={nuevaObra.Descripcion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Descripcion: v || "" })} />
             </Stack>
           </div>
-
-          {/* Pie */}
           <div className={styles.modalFooter}>
-            {saving ? (
-              <Spinner label="Guardando..." />
-            ) : (
+            {saving ? <Spinner label="Guardando..." /> : (
               <>
                 <DefaultButton text="Cancelar" onClick={() => setIsOpen(false)} />
-                <PrimaryButton
-                  text={obraEditandoId ? "Actualizar" : "Lanzar Proyecto"}
-                  className={styles.btnLaunch}
-                  onClick={handleGuardar}
-                  disabled={!nuevaObra.Nombre || !nuevaObra.ClienteId}
-                />
+                <PrimaryButton text={obraEditandoId ? "Actualizar" : "Lanzar Proyecto"} className={styles.btnLaunch} onClick={handleGuardar} disabled={!nuevaObra.Nombre || !nuevaObra.ClienteId} />
               </>
             )}
           </div>
-
         </div>
       </Modal>
-      {/* ──────────────────────────────────────────────────────────────────────── */}
+
+      {/* ── CUADRO DE DIÁLOGO SECUNDARIO: CREACIÓN EXPRÉS DE CLIENTES ── */}
+      <Dialog
+        hidden={!isNuevoClienteOpen}
+        onDismiss={() => setIsNuevoClienteOpen(false)}
+        dialogContentProps={{
+          type: DialogType.normal,
+          title: 'Añadir Cliente Exprés',
+          subText: 'Introduce el nombre de la empresa o cliente para darlo de alta instantáneamente en el sistema.'
+        }}
+        modalProps={{ isBlocking: true }}
+      >
+        <TextField 
+          label="Nombre del Cliente / Razón Social" 
+          required 
+          value={nuevoClienteNombre} 
+          onChange={(_, v) => setNuevoClienteNombre(v || "")}
+          placeholder="Ej: Iberdrola Renovables"
+        />
+        <DialogFooter>
+          {creandoCliente ? (
+            <Spinner size={SpinnerSize.medium} label="Registrando..." />
+          ) : (
+            <>
+              <PrimaryButton onClick={handleCrearClienteRapido} text="Crear y Seleccionar" disabled={!nuevoClienteNombre.trim()} />
+              <DefaultButton onClick={() => setIsNuevoClienteOpen(false)} text="Cancelar" />
+            </>
+          )}
+        </DialogFooter>
+      </Dialog>
+      {/* ────────────────────────────────────────────────────────────── */}
     </div>
   );
 };
