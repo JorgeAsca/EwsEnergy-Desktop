@@ -13,6 +13,7 @@ const navGroups: INavLinkGroup[] = [
     links: [
       { name: "Inventario", url: "", key: "inventario", icon: "Package" },
       { name: "Personal", url: "", key: "personal", icon: "Group" },
+      { name: "Clientes", url: "", key: "clientes", icon: "Group" },
       { name: "Obras", url: "", key: "obras", icon: "ConstructionCone" },
       { name: "Planificación", url: "", key: "planificacion", icon: "Calendar" }, 
       { name: "Asignaciones", url: "", key: "asignaciones", icon: "ContactLink" },

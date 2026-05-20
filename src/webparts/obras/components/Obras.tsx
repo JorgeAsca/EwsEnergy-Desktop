@@ -12,6 +12,7 @@ import { VistaAsignaciones } from './Vistas/Asignaciones/VistaAsignaciones';
 import { VistaFotosObra } from './Vistas/Fotos/VistaFotosObra';
 import { VistaPlanificacion } from './Vistas/Planificacion/VistaPlanificacion';
 import { VistaHistorialTarjetas } from './Vistas/historial/VistaHistorialReportes';
+import { ListaClientes } from './Vistas/Clientes/VistaClientes';
 
 export const Obras: React.FC<IObrasProps> = (props) => {
   const [selectedKey, setSelectedKey] = React.useState<string>('obras');
@@ -26,6 +27,7 @@ export const Obras: React.FC<IObrasProps> = (props) => {
       case 'asignaciones': return <VistaAsignaciones context={props.context} />;
       case 'fotos': return <VistaFotosObra context={props.context} />;
       case 'historial': return <VistaHistorialTarjetas context={props.context} />;
+      case 'clientes': return <ListaClientes context={props.context} />;
       default: return <TablaObras context={props.context} />;
     }
   };

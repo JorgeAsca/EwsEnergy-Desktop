@@ -1,0 +1,99 @@
+/* ListaClientes.module.scss */
+
+.container {
+  padding: 20px;
+  background-color: #f3f2f1;
+  min-height: calc(100vh - 100px);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow-x: hidden; 
+}
+
+.headerSection {
+  padding-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.tableContainer {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 10px;
+  overflow: hidden; /* Adiós al scroll horizontal */
+}
+
+/* Colores de marca EWS Energy (o el que estés usando para botones principales) */
+.btnNuevoCliente {
+  background-color: #004d3d !important;
+  border-color: #004d3d !important;
+  color: white !important;
+  
+  &:hover {
+    background-color: #00362b !important;
+    border-color: #00362b !important;
+  }
+}
+
+.modalContent {
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  box-sizing: border-box;
+}
+
+/* --- SOLUCIÓN PARA MÓVIL SIN SCROLL --- */
+@media (max-width: 768px) {
+  .headerSection {
+    flex-direction: column;
+    align-items: stretch !important;
+    text-align: center;
+  }
+
+  /* 1. Escondemos los encabezados de columnas de la tabla */
+  :global(.ms-DetailsHeader) {
+    display: none !important; 
+  }
+
+  /* 2. Convertimos cada fila en una "tarjeta" */
+  :global(.ms-DetailsRow) {
+    border-bottom: 1px solid #edebe9;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+
+  /* 3. Forzamos a que las celdas se apilen verticalmente */
+  :global(.ms-DetailsRow-fields) {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+  }
+
+  :global(.ms-DetailsRow-cell) {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 6px 12px !important;
+    height: auto !important;
+    display: block !important;
+  }
+
+  /* 4. ARREGLO: Buscamos el div con el data-label que configuramos en el TSX */
+  div[data-label] {
+    display: flex;
+    align-items: center;
+    width: 100%;
+
+    &::before {
+      content: attr(data-label);
+      font-weight: 600;
+      width: 90px; /* Espacio reservado para palabras como "Opciones:" o "Teléfono:" */
+      min-width: 90px;
+      color: #605e5c;
+      font-size: 13px;
+      display: inline-block;
+      margin-right: 10px;
+    }
+  }
+}
