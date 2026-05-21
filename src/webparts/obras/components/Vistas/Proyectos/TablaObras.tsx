@@ -625,7 +625,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           </div>
         </div>
       </Modal>
-
       <Dialog
         hidden={!isNuevoClienteOpen}
         onDismiss={() => setIsNuevoClienteOpen(false)}

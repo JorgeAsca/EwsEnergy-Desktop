@@ -157,7 +157,7 @@ export const VistaAsignaciones: React.FC<{ context: any }> = (props) => {
                     />
                 </Stack>
             </div>
-
+{/* Esto es un comentario */}
             <Separator className={styles.separator} />
 
             <div className={styles.gridObras}>
@@ -179,7 +179,6 @@ export const VistaAsignaciones: React.FC<{ context: any }> = (props) => {
                                         asignados.map((asig) => {
                                             const p = data.personal.find((per) => per.Id === asig.PersonalId);
                                             const semaforo = service.calcularSemaforoAsignacion(asig.FechaFinPrevista?.toString());
-
                                             return (
                                                 <div key={asig.Id} className={styles.personalRow}>
                                                     <Stack horizontal horizontalAlign="space-between" verticalAlign="center" style={{ width: "100%" }}>
