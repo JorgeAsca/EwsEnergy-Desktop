@@ -35,7 +35,7 @@ export class ProjectService {
     }
   }
 
-  // MODIFICADO: Ahora devuelve el ID (number) de la obra creada
+  // MODIFICADO: Ahora guarda correctamente las JornadasTotales
   public async crearObra(nuevaObra: any): Promise<number> {
     const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items`;
     const body = JSON.stringify({
@@ -44,10 +44,54 @@ export class ProjectService {
       DireccionObra: nuevaObra.Direccion,
       FechaInicio: nuevaObra.FechaInicio,
       FechaFinPrevista: nuevaObra.FechaFin,
-      JornadasTotales: nuevaObra.Jornadas,
+      JornadasTotales: nuevaObra.JornadasTotales, // <--- EL ARREGLO ESTÁ AQUÍ
       EstadoObra: "Fase Previa",
       ProgresoReal: 0,
     });
+
+    const response = await this._context.spHttpClient.post(
+      endpoint,
+      SPHttpClient.configurations.v1,
+      {
+        headers: {
+          Accept: "application/json",
+          "Content-type": "application/json;odata=nometadata",
+          "odata-version": "",
+        },
+        body: body,
+      },
+    );
+
+    const data = await response.json();
+    return data.Id;
+  }
+
+  // MODIFICADO: Ahora actualiza correctamente las JornadasTotales
+  public async updateObra(id: number, obraActualizada: any): Promise<void> {
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
+    const body = JSON.stringify({
+      Title: obraActualizada.Nombre,
+      ClienteId: obraActualizada.ClienteId,
+      DireccionObra: obraActualizada.Direccion,
+      FechaInicio: obraActualizada.FechaInicio,
+      FechaFinPrevista: obraActualizada.FechaFin,
+      JornadasTotales: obraActualizada.JornadasTotales, // <--- Y EL ARREGLO ESTÁ AQUÍ
+    });
+
+    await this._context.spHttpClient.post(
+      endpoint,
+      SPHttpClient.configurations.v1,
+      {
+        headers: {
+          Accept: "application/json;odata=nometadata",
+          "Content-type": "application/json;odata=nometadata",
+          "odata-version": "",
+          "IF-MATCH": "*",
+          "X-HTTP-Method": "MERGE",
+        },
+        body: body,
+      },
+    );
 
     const response = await this._context.spHttpClient.post(
       endpoint,
@@ -140,33 +184,6 @@ export class ProjectService {
           "IF-MATCH": "*",
           "odata-version": "",
         },
-      },
-    );
-  }
-
-  public async updateObra(id: number, obraActualizada: any): Promise<void> {
-    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
-    const body = JSON.stringify({
-      Title: obraActualizada.Nombre,
-      ClienteId: obraActualizada.ClienteId,
-      DireccionObra: obraActualizada.Direccion,
-      FechaInicio: obraActualizada.FechaInicio,
-      FechaFinPrevista: obraActualizada.FechaFin,
-      JornadasTotales: obraActualizada.Jornadas,
-    });
-
-    await this._context.spHttpClient.post(
-      endpoint,
-      SPHttpClient.configurations.v1,
-      {
-        headers: {
-          Accept: "application/json;odata=nometadata",
-          "Content-type": "application/json;odata=nometadata",
-          "odata-version": "",
-          "IF-MATCH": "*",
-          "X-HTTP-Method": "MERGE",
-        },
-        body: body,
       },
     );
   }
