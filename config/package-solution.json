@@ -3,7 +3,7 @@
   "solution": {
     "name": "ews-energy-client-side-solution",
     "id": "c1ba0b56-e391-447e-9c3c-501ab1ffa0c0",
-    "version": "1.0.0.0",
+    "version": "1.0.0.3",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
