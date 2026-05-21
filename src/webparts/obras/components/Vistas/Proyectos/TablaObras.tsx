@@ -68,6 +68,9 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   // Archivos reales ya traídos desde la nube de SharePoint
   const [archivosNube, setArchivosNube] = React.useState<any[]>([]);
 
+  // NUEVO ESTADO: Para controlar qué foto se está viendo en grande
+  const [fotoAmpliada, setFotoAmpliada] = React.useState<string | null>(null);
+
   const [loading, setLoading] = React.useState(true);
   const [loadingFotos, setLoadingFotos] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
@@ -238,7 +241,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     return () => clearTimeout(debounce);
   }, [nuevaObra.Direccion]);
 
-  // --- FUNCIÓN REESCRITA: Carga los archivos guardados en la carpeta de SharePoint ---
   const refrescarArchivosNube = async (idObra: number) => {
     if (services.project.getArchivosDeCarpeta) {
       const nombreCarpeta = `Obra_${idObra}`;
@@ -257,8 +259,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     try {
       const fotos = await services.project.getFotosPorObra(obra.Id as number);
       setFotosObra(fotos || []);
-
-      // Al pinchar en la obra, leemos inmediatamente qué planos y fotos reales hay en la nube
       await refrescarArchivosNube(obra.Id as number);
     } catch (e) { console.error(e); } 
     finally { setLoadingFotos(false); }
@@ -276,7 +276,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     }
   };
 
-  // --- CORREGIDO: Ahora sí capturamos y vinculamos correctamente el archivo binario ---
   const handleSubirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -297,7 +296,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     setFotosPreviasLocales(prev => prev.filter((_, i) => i !== index));
   };
 
-  // --- CORREGIDO: Sube todos los binarios y fuerza a la app a refrescar la pantalla ---
   const handleConfirmarSubidaArchivos = async () => {
     if (!obraSeleccionada) return;
     try {
@@ -305,7 +303,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       const idObra = obraSeleccionada.Id as number;
       const nombreCarpeta = `Obra_${idObra}`;
       
-      // Combinamos planos y fotos garantizando que enviamos el File binario real
       const archivosParaSubir = [
         ...archivosLocales.map(a => a.file),
         ...fotosPreviasLocales.map(f => f.file)
@@ -313,18 +310,12 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
 
       if (archivosParaSubir.length > 0) {
         await services.project.asegurarCarpeta(nombreCarpeta);
-        
         for (const file of archivosParaSubir) {
           await services.project.subirArchivoACarpeta(nombreCarpeta, file);
         }
-
         alert("✅ ¡Todos los archivos e imágenes se han subido a SharePoint!");
-        
-        // 1. Limpiamos la bandeja temporal
         setArchivosLocales([]);
         setFotosPreviasLocales([]);
-
-        // 2. ¡LA CLAVE! Forzamos la descarga en caliente desde SharePoint para pintarlos en la app ya mismo
         await refrescarArchivosNube(idObra);
       }
     } catch (error) {
@@ -344,7 +335,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       } else {
         await services.project.crearObra(nuevaObra);
       }
-
       setIsOpen(false);
       resetForm();
       await cargarTodo();
@@ -390,22 +380,16 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     );
   };
 
-  // ─── NUEVO: ELIMINAR ARCHIVO DIRECTAMENTE DE LA NUBE DE SHAREPOINT ───
   const handleEliminarArchivoNube = async (nombreArchivo: string) => {
     if (!obraSeleccionada) return;
     if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el archivo "${nombreArchivo}" de SharePoint?`)) return;
 
     try {
-      setLoadingFotos(true); // Reutilizamos el spinner de carga para bloquear la sección
+      setLoadingFotos(true); 
       const idObra = obraSeleccionada.Id as number;
       const nombreCarpeta = `Obra_${idObra}`;
-
-      // Llamamos al servicio para borrarlo en la nube
       await services.project.eliminarArchivoDeCarpeta(nombreCarpeta, nombreArchivo);
-      
       alert("✅ Archivo eliminado correctamente de SharePoint.");
-
-      // Refrescamos la lista de archivos en caliente para que desaparezca de la pantalla al instante
       await refrescarArchivosNube(idObra);
     } catch (error) {
       alert("❌ No se pudo eliminar el archivo. Inténtalo de nuevo.");
@@ -422,7 +406,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     return acc;
   }, {} as Record<string, IObraCard[]>);
 
-  // --- SEPARACIÓN AUTOMÁTICA EN LA CAPA VISUAL (Nube) ---
   const planosNube = archivosNube.filter(a => !a.Name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
   const fotosNube = archivosNube.filter(a => a.Name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
 
@@ -483,7 +466,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
               </Stack>
 
-              {/* ── PLANOS Y DOCUMENTACIÓN DESDE SHAREPOINT NATIVO ── */}
               <div className={styles.planosSection}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Planos y Documentación</Text>
@@ -492,7 +474,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
                 
                 <Stack horizontal tokens={{ childrenGap: 15 }} wrap>
-                  {/* PLANOS EN NUBE */}
                   {planosNube.map((archivo, idx) => {
                     let icono = "Document";
                     if (archivo.Name.endsWith(".pdf")) icono = "PDF";
@@ -503,14 +484,13 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                     const link = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? tenantUrl + archivo.ServerRelativeUrl : archivo.ServerRelativeUrl;
 
                     return (
-                      <div key={`nube-plano-${idx}`} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px' }}>
+                      <div key={`nube-plano-${idx}`} className={styles.planoCard}>
                         <Icon iconName={icono} className={icono === 'PDF' ? styles.pdfIcon : styles.dwgIcon} />
                         <Text variant="smallPlus">
                           <a href={encodeURI(link)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 600 }}>
                             {archivo.Name}
                           </a>
                         </Text>
-                        {/* AÑADIDO: BOTÓN ELIMINAR PLANO */}
                         <IconButton
                           iconProps={{ iconName: "Cancel" }}
                           title="Eliminar archivo permanentemente de SharePoint"
@@ -521,7 +501,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                     )
                   })}
 
-                  {/* PENDIENTES */}
                   {archivosLocales.map((archivo, idx) => (
                     <div key={`local-plano-${idx}`} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px', border: '1px dashed #0078d4' }}>
                       <Icon iconName={archivo.icono} className={archivo.icono === 'PDF' ? styles.pdfIcon : styles.dwgIcon} />
@@ -541,7 +520,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
               </div>
 
-              {/* ── FOTOGRAFÍAS DESDE SHAREPOINT NATIVO ── */}
               <div className={styles.planosSection} style={{ marginTop: 20 }}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Fotografías Previas / Finales</Text>
@@ -550,17 +528,22 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
 
                 <Stack horizontal tokens={{ childrenGap: 12 }} wrap>
-                  {/* FOTOS EN NUBE */}
                   {fotosNube.map((foto, idx) => {
                     const tenantUrl = props.context.pageContext.web.absoluteUrl.replace(props.context.pageContext.web.serverRelativeUrl, "");
                     const link = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? tenantUrl + foto.ServerRelativeUrl : foto.ServerRelativeUrl;
+                    const cleanLink = encodeURI(link);
                     
                     return (
                       <div key={`nube-foto-${idx}`} style={{ position: "relative", display: "inline-block" }}>
-                        <a href={encodeURI(link)} target="_blank" rel="noreferrer">
-                          <Image src={link} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '1px solid #ccc', cursor: 'pointer' }} />
-                        </a>
-                        {/* AÑADIDO: BOTÓN ELIMINAR FOTO */}
+                        {/* AÑADIDO ONCLICK PARA ABRIR EL LIGHTBOX */}
+                        <Image 
+                          src={cleanLink} 
+                          width={150} 
+                          height={100} 
+                          imageFit={ImageFit.cover} 
+                          style={{ borderRadius: '6px', border: '1px solid #ccc', cursor: 'pointer' }} 
+                          onClick={() => setFotoAmpliada(cleanLink)}
+                        />
                         <IconButton
                           iconProps={{ iconName: "Cancel" }}
                           title="Eliminar foto permanentemente de SharePoint"
@@ -574,10 +557,17 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                     );
                   })}
 
-                  {/* FOTOS PENDIENTES */}
                   {fotosPreviasLocales.map((fotoObj, idx) => (
                     <div key={`local-foto-${idx}`} style={{ position: "relative", display: "inline-block" }}>
-                      <Image src={fotoObj.url} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '2px dashed #0078d4', opacity: 0.7 }} />
+                      {/* AÑADIDO ONCLICK PARA ABRIR EL LIGHTBOX */}
+                      <Image 
+                        src={fotoObj.url} 
+                        width={150} 
+                        height={100} 
+                        imageFit={ImageFit.cover} 
+                        style={{ borderRadius: '6px', border: '2px dashed #0078d4', opacity: 0.7, cursor: 'pointer' }} 
+                        onClick={() => setFotoAmpliada(fotoObj.url)}
+                      />
                       <IconButton
                         iconProps={{ iconName: "Cancel" }}
                         title="Quitar de la cola"
@@ -596,7 +586,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
               </div>
 
-              {/* ── BANDEJA DE CONFIRMACIÓN ── */}
               {(archivosLocales.length > 0 || fotosPreviasLocales.length > 0) && (
                 <div style={{ marginTop: 25, padding: '15px 20px', backgroundColor: '#f3f2f1', borderRadius: '8px', border: '1px solid #0078d4' }}>
                   <Stack horizontal verticalAlign="center" horizontalAlign="space-between">
@@ -618,21 +607,55 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </div>
               )}
 
+              {/* ── REPORTES DE JORNADA (TAMBIÉN CON LIGHTBOX INTEGRADOR) ── */}
               <div className={styles.historialSection}>
                 <Text variant="large" className={styles.sectionTitle}>Reportes de Jornada</Text>
                 {loadingFotos ? <Spinner size={SpinnerSize.large} label="Cargando reportes..." /> : fotosObra.length > 0 ? (
                   <Stack tokens={{ childrenGap: 15 }} styles={{ root: { marginTop: 15 } }}>
-                    {fotosObra.map((f, i) => (
-                      <div key={i} className={styles.fotoCard}>
-                        <Stack horizontal tokens={{ childrenGap: 15 }}>
-                          <Image src={f.UrlFoto?.Url} width={120} height={90} imageFit={ImageFit.cover} className={styles.fotoThumb} />
-                          <Stack>
-                            <Text className={styles.fotoFecha}>📅 {new Date(f.FechaRegistro).toLocaleDateString()} - Worker {f.Operario}</Text>
-                            <div className={styles.fotoComentarioBox}><Text className={styles.fotoComentarioText}>"{f.Comentarios || "Sin observaciones técnicas"}"</Text></div>
+                    {fotosObra.map((f, i) => {
+                      let fotoSrc = "";
+                      
+                      if (f.AttachmentFiles && f.AttachmentFiles.length > 0) {
+                        fotoSrc = f.AttachmentFiles[0].ServerRelativeUrl;
+                      } else if (typeof f.UrlFoto === 'string' && f.UrlFoto.startsWith('{')) {
+                        try { const imgData = JSON.parse(f.UrlFoto); fotoSrc = imgData.serverRelativeUrl; } catch(e){}
+                      } else if (f.UrlFoto && f.UrlFoto.Url) {
+                        fotoSrc = f.UrlFoto.Url;
+                      }
+
+                      if (fotoSrc && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+                        const tenantUrl = props.context.pageContext.web.absoluteUrl.replace(props.context.pageContext.web.serverRelativeUrl, "");
+                        fotoSrc = tenantUrl + fotoSrc;
+                      }
+
+                      const cleanFotoSrc = fotoSrc ? encodeURI(fotoSrc) : "";
+
+                      return (
+                        <div key={i} className={styles.fotoCard}>
+                          <Stack horizontal tokens={{ childrenGap: 15 }}>
+                            {cleanFotoSrc ? (
+                              <Image 
+                                src={cleanFotoSrc} 
+                                width={120} 
+                                height={90} 
+                                imageFit={ImageFit.cover} 
+                                className={styles.fotoThumb} 
+                                style={{ borderRadius: '4px', border: '1px solid #edebe9', cursor: 'pointer' }}
+                                onClick={() => setFotoAmpliada(cleanFotoSrc)} // ABRIR EL LIGHTBOX AL PINCHAR
+                              />
+                            ) : (
+                              <div style={{ width: 120, height: 90, backgroundColor: '#f3f2f1', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #edebe9' }}>
+                                <Icon iconName="Photo2" style={{ fontSize: 24, color: '#c8c6c4' }} />
+                              </div>
+                            )}
+                            <Stack>
+                              <Text className={styles.fotoFecha}>📅 {new Date(f.FechaRegistro).toLocaleDateString()} - Worker {f.Operario}</Text>
+                              <div className={styles.fotoComentarioBox}><Text className={styles.fotoComentarioText}>"{f.Comentarios || "Sin observaciones técnicas"}"</Text></div>
+                            </Stack>
                           </Stack>
-                        </Stack>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </Stack>
                 ) : <MessageBar messageBarType={MessageBarType.info}>No hay reportes diarios para esta obra.</MessageBar>}
               </div>
@@ -759,6 +782,42 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           )}
         </DialogFooter>
       </Dialog>
+
+      {/* ─── MODAL TRANSPARENTE DE PREVISUALIZACIÓN DE FOTOS (LIGHTBOX) ─── */}
+      <Modal
+        isOpen={!!fotoAmpliada}
+        onDismiss={() => setFotoAmpliada(null)}
+        isBlocking={false}
+        styles={{
+          main: {
+            background: 'transparent',
+            boxShadow: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            outline: 'none'
+          }
+        }}
+      >
+        {fotoAmpliada && (
+          <div style={{ position: 'relative', outline: 'none' }}>
+            <IconButton
+              iconProps={{ iconName: 'Cancel' }}
+              onClick={() => setFotoAmpliada(null)}
+              title="Cerrar imagen"
+              styles={{
+                root: { position: 'absolute', top: -40, right: -40, color: 'white', zIndex: 10 },
+                icon: { fontSize: 20 }
+              }}
+            />
+            <img 
+              src={fotoAmpliada} 
+              style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '8px', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }} 
+              alt="Previsualización ampliada" 
+            />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

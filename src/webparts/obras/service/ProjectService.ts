@@ -213,7 +213,8 @@ export class ProjectService {
   }
 
   public async getFotosPorObra(obraId: number): Promise<any[]> {
-    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Registro_Fotos_Diarias')/items?$filter=ObraId eq ${obraId}&$orderby=FechaRegistro desc`;
+    // Añadido $expand=AttachmentFiles por si las fotos subidas son adjuntos
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('Registro_Fotos_Diarias')/items?$filter=ObraId eq ${obraId}&$orderby=FechaRegistro desc&$expand=AttachmentFiles`;
 
     try {
       const response = await this._context.spHttpClient.get(
