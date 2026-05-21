@@ -69,8 +69,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   const [loadingFotos, setLoadingFotos] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
-
-  const [docsObra, setDocsObra] = React.useState([]);
   
   // NUEVO ESTADO: Para controlar el botón de subida de archivos específicos
   const [uploadingFiles, setUploadingFiles] = React.useState(false);
@@ -307,8 +305,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         // Limpiamos la bandeja visual tras el éxito
         setArchivosLocales([]);
         setFotosPreviasLocales([]);
-
-        await refrescarDocumentos(idObra);
       }
     } catch (error) {
       alert("❌ Ocurrió un error al subir los archivos. Por favor, inténtalo de nuevo.");
@@ -337,17 +333,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       console.error(e);
     } 
     finally { setSaving(false); }
-  };
-
-  const refrescarDocumentos = async (obraId: number) => {
-    try {
-      const docs = await (services.project as any).getDocumentosPorObra(obraId);
-      // Aquí estamos suponiendo que tienes un estado donde guardas los docs para mostrarlos
-      // Si no lo tienes, añade: const [docsObra, setDocsObra] = React.useState([]);
-      setDocsObra(docs); 
-    } catch (e) {
-      console.error("Error refrescando documentos:", e);
-    }
   };
 
   const resetForm = () => {
