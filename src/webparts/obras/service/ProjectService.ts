@@ -321,4 +321,51 @@ export class ProjectService {
       } as IObraCard;
     });
   }
+
+  /**
+     * Obtiene los archivos guardados en la carpeta de la obra
+     */
+    public async getArchivosDeCarpeta(nombreCarpeta: string): Promise<any[]> {
+        try {
+            // CORREGIDO: Ahora busca en "Documentos_Obras" usando tu variable _docLibraryName
+            const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/GetFolderByServerRelativeUrl('${this._docLibraryName}/${nombreCarpeta}')/Files`;
+            
+            const response = await this._context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1, {
+                headers: { 'Accept': 'application/json;odata=nometadata' }
+            });
+            
+            if (!response.ok) {
+                console.warn("Carpeta vacía o no encontrada en SharePoint.");
+                return [];
+            }
+            
+            const data = await response.json();
+            return data.value || [];
+        } catch (e) {
+            console.error("Error al obtener los archivos:", e);
+            return [];
+        }
+    }
+
+    /**
+   * Elimina un archivo físico de la carpeta de la obra en SharePoint
+   */
+  public async eliminarArchivoDeCarpeta(nombreCarpeta: string, nombreArchivo: string): Promise<void> {
+    // Construimos la URL relativa del archivo en SharePoint
+    const serverRelativeUrl = `${this._context.pageContext.web.serverRelativeUrl}/${this._docLibraryName}/${nombreCarpeta}/${nombreArchivo}`;
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/GetFileByServerRelativeUrl('${serverRelativeUrl}')`;
+
+    const response = await this._context.spHttpClient.post(endpoint, SPHttpClient.configurations.v1, {
+      headers: {
+        'Accept': 'application/json',
+        'X-HTTP-Method': 'DELETE',
+        'IF-MATCH': '*'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error("No se pudo eliminar el archivo de SharePoint: " + errorText);
+    }
+  }
 }

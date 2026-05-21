@@ -61,18 +61,19 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   const [obraSeleccionada, setObraSeleccionada] = React.useState<IObraCard | null>(null);
   const [fotosObra, setFotosObra] = React.useState<any[]>([]);
 
-  // Estados locales para los archivos reales
+  // Estados locales para los archivos (Bandeja temporal de subida)
   const [archivosLocales, setArchivosLocales] = React.useState<{ nombre: string; icono: string; file: File }[]>([]);
   const [fotosPreviasLocales, setFotosPreviasLocales] = React.useState<{ url: string; file: File }[]>([]);
+
+  // Archivos reales ya traídos desde la nube de SharePoint
+  const [archivosNube, setArchivosNube] = React.useState<any[]>([]);
 
   const [loading, setLoading] = React.useState(true);
   const [loadingFotos, setLoadingFotos] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   
-  // NUEVO ESTADO: Para controlar el botón de subida de archivos específicos
   const [uploadingFiles, setUploadingFiles] = React.useState(false);
-  
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [obraEditandoId, setObraEditandoId] = React.useState<number | null>(null);
 
@@ -237,14 +238,28 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     return () => clearTimeout(debounce);
   }, [nuevaObra.Direccion]);
 
+  // --- FUNCIÓN REESCRITA: Carga los archivos guardados en la carpeta de SharePoint ---
+  const refrescarArchivosNube = async (idObra: number) => {
+    if (services.project.getArchivosDeCarpeta) {
+      const nombreCarpeta = `Obra_${idObra}`;
+      const archivos = await services.project.getArchivosDeCarpeta(nombreCarpeta);
+      setArchivosNube(archivos || []);
+    }
+  };
+
   const verDetallesObra = async (obra: IObraCard) => {
     setObraSeleccionada(obra);
     setLoadingFotos(true);
     setArchivosLocales([]); 
     setFotosPreviasLocales([]);
+    setArchivosNube([]); 
+
     try {
       const fotos = await services.project.getFotosPorObra(obra.Id as number);
       setFotosObra(fotos || []);
+
+      // Al pinchar en la obra, leemos inmediatamente qué planos y fotos reales hay en la nube
+      await refrescarArchivosNube(obra.Id as number);
     } catch (e) { console.error(e); } 
     finally { setLoadingFotos(false); }
   };
@@ -261,12 +276,13 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     }
   };
 
+  // --- CORREGIDO: Ahora sí capturamos y vinculamos correctamente el archivo binario ---
   const handleSubirFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFotosPreviasLocales(prev => [...prev, { url: reader.result as string, file }]);
+        setFotosPreviasLocales(prev => [...prev, { url: reader.result as string, file: file }]);
         if (inputFotoRef.current) inputFotoRef.current.value = ""; 
       };
       reader.readAsDataURL(file);
@@ -281,30 +297,35 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     setFotosPreviasLocales(prev => prev.filter((_, i) => i !== index));
   };
 
-  // ─── NUEVO: FUNCIÓN ESPECÍFICA PARA CONFIRMAR Y SUBIR LOS ARCHIVOS SELECCIONADOS ───
+  // --- CORREGIDO: Sube todos los binarios y fuerza a la app a refrescar la pantalla ---
   const handleConfirmarSubidaArchivos = async () => {
     if (!obraSeleccionada) return;
     try {
       setUploadingFiles(true);
       const idObra = obraSeleccionada.Id as number;
+      const nombreCarpeta = `Obra_${idObra}`;
+      
+      // Combinamos planos y fotos garantizando que enviamos el File binario real
       const archivosParaSubir = [
         ...archivosLocales.map(a => a.file),
         ...fotosPreviasLocales.map(f => f.file)
       ];
 
       if (archivosParaSubir.length > 0) {
-        // Creamos la carpeta usando el ID de la obra y subimos los archivos uno por uno
-        const nombreCarpeta = `Obra_${idObra}`;
         await services.project.asegurarCarpeta(nombreCarpeta);
         
         for (const file of archivosParaSubir) {
           await services.project.subirArchivoACarpeta(nombreCarpeta, file);
         }
 
-        alert("✅ ¡Documentos y fotografías subidos exitosamente al proyecto!");
-        // Limpiamos la bandeja visual tras el éxito
+        alert("✅ ¡Todos los archivos e imágenes se han subido a SharePoint!");
+        
+        // 1. Limpiamos la bandeja temporal
         setArchivosLocales([]);
         setFotosPreviasLocales([]);
+
+        // 2. ¡LA CLAVE! Forzamos la descarga en caliente desde SharePoint para pintarlos en la app ya mismo
+        await refrescarArchivosNube(idObra);
       }
     } catch (error) {
       alert("❌ Ocurrió un error al subir los archivos. Por favor, inténtalo de nuevo.");
@@ -314,7 +335,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     }
   };
 
-  // ─── MODIFICADO: Guardar Modal YA NO gestiona archivos, solo datos de texto ───
   const handleGuardar = async () => {
     if (!nuevaObra.Nombre || !nuevaObra.ClienteId) return;
     try {
@@ -370,12 +390,41 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     );
   };
 
+  // ─── NUEVO: ELIMINAR ARCHIVO DIRECTAMENTE DE LA NUBE DE SHAREPOINT ───
+  const handleEliminarArchivoNube = async (nombreArchivo: string) => {
+    if (!obraSeleccionada) return;
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar permanentemente el archivo "${nombreArchivo}" de SharePoint?`)) return;
+
+    try {
+      setLoadingFotos(true); // Reutilizamos el spinner de carga para bloquear la sección
+      const idObra = obraSeleccionada.Id as number;
+      const nombreCarpeta = `Obra_${idObra}`;
+
+      // Llamamos al servicio para borrarlo en la nube
+      await services.project.eliminarArchivoDeCarpeta(nombreCarpeta, nombreArchivo);
+      
+      alert("✅ Archivo eliminado correctamente de SharePoint.");
+
+      // Refrescamos la lista de archivos en caliente para que desaparezca de la pantalla al instante
+      await refrescarArchivosNube(idObra);
+    } catch (error) {
+      alert("❌ No se pudo eliminar el archivo. Inténtalo de nuevo.");
+      console.error(error);
+    } finally {
+      setLoadingFotos(false);
+    }
+  };
+
   const obrasAgrupadas = obras.reduce((acc, obra) => {
     const estado = obra.EstadoObra || "Sin Asignar";
     if (!acc[estado]) acc[estado] = [];
     acc[estado].push(obra);
     return acc;
   }, {} as Record<string, IObraCard[]>);
+
+  // --- SEPARACIÓN AUTOMÁTICA EN LA CAPA VISUAL (Nube) ---
+  const planosNube = archivosNube.filter(a => !a.Name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
+  const fotosNube = archivosNube.filter(a => a.Name.match(/\.(jpg|jpeg|png|gif|webp)$/i));
 
   if (loading && obras.length === 0) return <Spinner size={SpinnerSize.large} label="Sincronizando Dashboard EWS..." />;
 
@@ -434,6 +483,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
               </Stack>
 
+              {/* ── PLANOS Y DOCUMENTACIÓN DESDE SHAREPOINT NATIVO ── */}
               <div className={styles.planosSection}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Planos y Documentación</Text>
@@ -442,25 +492,56 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
                 
                 <Stack horizontal tokens={{ childrenGap: 15 }} wrap>
-                  {archivosLocales.length > 0 ? (
-                    archivosLocales.map((archivo, idx) => (
-                      <div key={idx} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px' }}>
-                        <Icon iconName={archivo.icono} className={archivo.icono === 'PDF' ? styles.pdfIcon : styles.dwgIcon} />
-                        <Text variant="smallPlus">{archivo.nombre}</Text>
+                  {/* PLANOS EN NUBE */}
+                  {planosNube.map((archivo, idx) => {
+                    let icono = "Document";
+                    if (archivo.Name.endsWith(".pdf")) icono = "PDF";
+                    if (archivo.Name.endsWith(".dwg")) icono = "VisioDocument";
+                    if (archivo.Name.endsWith(".xlsx") || archivo.Name.endsWith(".xls")) icono = "ExcelDocument";
+                    
+                    const tenantUrl = props.context.pageContext.web.absoluteUrl.replace(props.context.pageContext.web.serverRelativeUrl, "");
+                    const link = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? tenantUrl + archivo.ServerRelativeUrl : archivo.ServerRelativeUrl;
+
+                    return (
+                      <div key={`nube-plano-${idx}`} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px' }}>
+                        <Icon iconName={icono} className={icono === 'PDF' ? styles.pdfIcon : styles.dwgIcon} />
+                        <Text variant="smallPlus">
+                          <a href={encodeURI(link)} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit', fontWeight: 600 }}>
+                            {archivo.Name}
+                          </a>
+                        </Text>
+                        {/* AÑADIDO: BOTÓN ELIMINAR PLANO */}
                         <IconButton
                           iconProps={{ iconName: "Cancel" }}
-                          title="Eliminar archivo"
-                          onClick={() => eliminarArchivoLocal(idx)}
+                          title="Eliminar archivo permanentemente de SharePoint"
+                          onClick={() => handleEliminarArchivoNube(archivo.Name)}
                           styles={{ root: { position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24 } }}
                         />
                       </div>
-                    ))
-                  ) : (
-                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay documentos adjuntos en esta sesión.</Text>
+                    )
+                  })}
+
+                  {/* PENDIENTES */}
+                  {archivosLocales.map((archivo, idx) => (
+                    <div key={`local-plano-${idx}`} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px', border: '1px dashed #0078d4' }}>
+                      <Icon iconName={archivo.icono} className={archivo.icono === 'PDF' ? styles.pdfIcon : styles.dwgIcon} />
+                      <Text variant="smallPlus">{archivo.nombre} <i style={{fontSize: 10, color: '#0078d4'}}>(Cola)</i></Text>
+                      <IconButton
+                        iconProps={{ iconName: "Cancel" }}
+                        title="Quitar de la cola"
+                        onClick={() => eliminarArchivoLocal(idx)}
+                        styles={{ root: { position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)', width: 24, height: 24 } }}
+                      />
+                    </div>
+                  ))}
+
+                  {planosNube.length === 0 && archivosLocales.length === 0 && (
+                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay documentos adjuntos en esta obra.</Text>
                   )}
                 </Stack>
               </div>
 
+              {/* ── FOTOGRAFÍAS DESDE SHAREPOINT NATIVO ── */}
               <div className={styles.planosSection} style={{ marginTop: 20 }}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Fotografías Previas / Finales</Text>
@@ -468,46 +549,70 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                   <input type="file" accept="image/*" ref={inputFotoRef} style={{ display: "none" }} onChange={handleSubirFoto} />
                 </Stack>
 
-                {fotosPreviasLocales.length > 0 ? (
-                  <Stack horizontal tokens={{ childrenGap: 10 }} wrap>
-                    {fotosPreviasLocales.map((fotoObj, idx) => (
-                      <div key={idx} style={{ position: "relative", display: "inline-block" }}>
-                        <Image src={fotoObj.url} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '1px solid #ccc' }} />
+                <Stack horizontal tokens={{ childrenGap: 12 }} wrap>
+                  {/* FOTOS EN NUBE */}
+                  {fotosNube.map((foto, idx) => {
+                    const tenantUrl = props.context.pageContext.web.absoluteUrl.replace(props.context.pageContext.web.serverRelativeUrl, "");
+                    const link = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? tenantUrl + foto.ServerRelativeUrl : foto.ServerRelativeUrl;
+                    
+                    return (
+                      <div key={`nube-foto-${idx}`} style={{ position: "relative", display: "inline-block" }}>
+                        <a href={encodeURI(link)} target="_blank" rel="noreferrer">
+                          <Image src={link} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '1px solid #ccc', cursor: 'pointer' }} />
+                        </a>
+                        {/* AÑADIDO: BOTÓN ELIMINAR FOTO */}
                         <IconButton
                           iconProps={{ iconName: "Cancel" }}
-                          title="Eliminar foto"
-                          onClick={() => eliminarFotoLocal(idx)}
+                          title="Eliminar foto permanentemente de SharePoint"
+                          onClick={() => handleEliminarArchivoNube(foto.Name)}
                           styles={{
-                            root: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: '50%', width: 24, height: 24 },
-                            icon: { fontSize: 12, color: '#d13438', fontWeight: 'bold' }
+                            root: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '50%', width: 22, height: 22 },
+                            icon: { fontSize: 10, color: '#d13438', fontWeight: 'bold' }
                           }}
                         />
                       </div>
-                    ))}
-                  </Stack>
-                ) : (
-                  <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay fotos previas cargadas en esta sesión.</Text>
-                )}
+                    );
+                  })}
+
+                  {/* FOTOS PENDIENTES */}
+                  {fotosPreviasLocales.map((fotoObj, idx) => (
+                    <div key={`local-foto-${idx}`} style={{ position: "relative", display: "inline-block" }}>
+                      <Image src={fotoObj.url} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '2px dashed #0078d4', opacity: 0.7 }} />
+                      <IconButton
+                        iconProps={{ iconName: "Cancel" }}
+                        title="Quitar de la cola"
+                        onClick={() => eliminarFotoLocal(idx)}
+                        styles={{
+                          root: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '50%', width: 22, height: 22 },
+                          icon: { fontSize: 10, color: '#d13438', fontWeight: 'bold' }
+                        }}
+                      />
+                    </div>
+                  ))}
+
+                  {fotosNube.length === 0 && fotosPreviasLocales.length === 0 && (
+                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay fotos previas cargadas.</Text>
+                  )}
+                </Stack>
               </div>
 
-              {/* ─── BANDEJA DE SUBIDA: SOLO APARECE SI HAY ARCHIVOS O FOTOS SELECCIONADOS ─── */}
+              {/* ── BANDEJA DE CONFIRMACIÓN ── */}
               {(archivosLocales.length > 0 || fotosPreviasLocales.length > 0) && (
-                <div style={{ marginTop: 25, padding: '15px 20px', backgroundColor: '#e1dfdd', borderRadius: '8px', border: '1px solid #c8c6c4' }}>
+                <div style={{ marginTop: 25, padding: '15px 20px', backgroundColor: '#f3f2f1', borderRadius: '8px', border: '1px solid #0078d4' }}>
                   <Stack horizontal verticalAlign="center" horizontalAlign="space-between">
                     <Stack>
-                      <Text variant="mediumPlus" style={{ fontWeight: 600, color: '#201f1e' }}>
-                        Tienes {archivosLocales.length + fotosPreviasLocales.length} archivo(s) sin subir
+                      <Text variant="mediumPlus" style={{ fontWeight: 600, color: '#0078d4' }}>
+                        🚀 Tienes {archivosLocales.length + fotosPreviasLocales.length} archivo(s) pendientes de subir
                       </Text>
                       <Text variant="small" style={{ color: '#605e5c' }}>
-                        Pincha en confirmar para guardarlos en la nube del proyecto.
+                        Haz clic en el botón para guardarlos definitivamente en la nube del proyecto.
                       </Text>
                     </Stack>
                     <PrimaryButton 
-                      text={uploadingFiles ? "Subiendo..." : "Confirmar Subida"} 
+                      text={uploadingFiles ? "Guardando en nube..." : "Guardar en Obra"} 
                       iconProps={{ iconName: "CloudUpload" }} 
                       onClick={handleConfirmarSubidaArchivos} 
                       disabled={uploadingFiles} 
-                      styles={{ root: { backgroundColor: '#0078d4' } }}
                     />
                   </Stack>
                 </div>
@@ -625,9 +730,10 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           </div>
         </div>
       </Modal>
+
       <Dialog
         hidden={!isNuevoClienteOpen}
-        onDismiss={() => setIsNuevoClienteOpen(false)}
+        onDismiss={() => setIsOpen(false)}
         dialogContentProps={{
           type: DialogType.normal,
           title: 'Añadir Cliente Exprés',
