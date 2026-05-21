@@ -34,7 +34,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
     const [loading, setLoading] = React.useState(true);
     const [subiendo, setSubiendo] = React.useState(false);
 
-    // Inputs independientes para fotos
     const fileInputRefFinal = React.useRef<HTMLInputElement>(null);
     const fileInputRefPrevia = React.useRef<HTMLInputElement>(null);
     
@@ -44,11 +43,13 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
     const [operario, setOperario] = React.useState<IPersonal | null>(null);
     const [obraSeleccionada, setObraSeleccionada] = React.useState<IObra | null>(null);
 
-    // Gestión de cuadrilla y horas
+    // Documentos de la obra recuperados de SharePoint
+    const [documentosObra, setDocumentosObra] = React.useState<any[]>([]);
+    const [cargandoDocs, setCargandoDocs] = React.useState(false);
+
     const [compañeros, setCompañeros] = React.useState<IPersonal[]>([]);
     const [horasTrabajadas, setHorasTrabajadas] = React.useState<IHorasPersonal>({});
 
-    // Listados de fotos separados
     const [fotosPrevias, setFotosPrevias] = React.useState<any[]>([]);
     const [fotosFinales, setFotosFinales] = React.useState<any[]>([]);
     const [comentarios, setComentarios] = React.useState("");
@@ -88,7 +89,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                 
                 if (yoMismo) {
                     setOperario(yoMismo);
-                    // Inicializamos las horas del operario actual por defecto en 8h (100%)
                     if (yoMismo.Id) {
                         setHorasTrabajadas(prev => ({ ...prev, [yoMismo.Id as number]: 8 }));
                     }
@@ -103,10 +103,10 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
         iniciar();
     }, [services]);
 
-    const handleSeleccionarObra = (ob: IObra) => {
+    // MODIFICADO: Ahora carga los documentos de la obra cuando se selecciona
+    const handleSeleccionarObra = async (ob: IObra) => {
         setObraSeleccionada(ob);
         
-        // Cargar los compañeros asignados automáticamente a esta obra
         const asigsObra = data.asignacionesGlobales.filter(a => Number(a.ObraId) === Number(ob.Id));
         const compis = data.listaPersonal.filter(p =>
             asigsObra.some(a => Number(a.PersonalId) === Number(p.Id)) && p.Id !== operario?.Id
@@ -114,7 +114,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
         
         setCompañeros(compis);
 
-        // Inicializar las horas de los compañeros asignados por defecto en 8 horas
         const horasIniciales: IHorasPersonal = {};
         if (operario?.Id) horasIniciales[operario.Id as number] = horasTrabajadas[operario.Id as number] || 8;
         compis.forEach(c => {
@@ -123,6 +122,17 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
         setHorasTrabajadas(horasIniciales);
 
         setPaso(2);
+
+        // Cargar los documentos desde la biblioteca de SharePoint
+        setCargandoDocs(true);
+        try {
+            const docs = await services.obras.getDocumentosPorObra(ob.Id as number);
+            setDocumentosObra(docs);
+        } catch (e) {
+            console.error("Error cargando los documentos de la obra", e);
+        } finally {
+            setCargandoDocs(false);
+        }
     };
 
     const agregarCompañeroExtra = (event: any, option?: IDropdownOption) => {
@@ -200,7 +210,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
 
         setSubiendo(true);
         try {
-            // 1. Subir fotos previas
             for (const fotoObj of fotosPrevias) {
                 await services.fotos.uploadCompressedPhoto(fotoObj.archivo, `${obraSeleccionada.Title}_Previas`, {
                     operario: operario.NombreyApellido,
@@ -212,7 +221,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                 });
             }
 
-            // 2. Subir fotos finales de cierre
             for (const fotoObj of fotosFinales) {
                 await services.fotos.uploadCompressedPhoto(fotoObj.archivo, obraSeleccionada.Title, {
                     operario: operario.NombreyApellido,
@@ -224,7 +232,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                 });
             }
 
-            // 3. Calcular consumo de jornadas (8h trabajadas = 1 jornada)
             let totalHorasCuadrilla = 0;
             Object.keys(horasTrabajadas).forEach(key => {
                 totalHorasCuadrilla += horasTrabajadas[Number(key)] || 0;
@@ -232,11 +239,9 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
             
             const jornadasConsumidasHoy = totalHorasCuadrilla / 8;
             
-            // 4. Descontar las jornadas consumidas del total del proyecto
             const jornadasTotales = obraSeleccionada.JornadasTotales || 30;
             const nuevoProgresoReal = Math.min((obraSeleccionada.ProgresoReal || 0) + ((jornadasConsumidasHoy / jornadasTotales) * 100), 100);
 
-            // Actualizamos en SharePoint el progreso calculado de forma automática
             await services.obras.actualizarProgresoObra(obraSeleccionada.Id as number, parseFloat(nuevoProgresoReal.toFixed(2)));
 
             alert(`¡Reporte enviado! Se registraron ${totalHorasCuadrilla}h en total (${jornadasConsumidasHoy.toFixed(2)} jornadas descontadas del proyecto).`);
@@ -263,7 +268,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                 {operario && <Persona imageUrl={operario.FotoPerfil} size={PersonaSize.size32} hidePersonaDetails />}
             </header>
 
-            {/* Indicador visual de los 5 pasos actuales */}
             <div className={styles.wizardNav}>
                 {[1, 2, 3, 4, 5].map((p) => (
                     <div key={p} className={`${styles.dot} ${paso >= p ? styles.active : ""}`} />
@@ -271,7 +275,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
             </div>
 
             <main className={styles.mainContent}>
-                {/* PASO 1: SELECCIÓN DE OBRA */}
                 {paso === 1 && (
                     <section className={styles.stepContainer}>
                         <Text variant="large" className={styles.stepTitle}>1. Selección de Obra</Text>
@@ -299,7 +302,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                     </section>
                 )}
 
-                {/* PASO 2: DATOS DE LA OBRA */}
                 {paso === 2 && obraSeleccionada && (
                     <section className={styles.stepContainer}>
                         <Text variant="large" className={styles.stepTitle}>2. Datos de la Obra</Text>
@@ -312,28 +314,46 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                                 <Icon iconName="MapPin" style={{ marginRight: '5px' }} /> {obraSeleccionada.DireccionObra || "Dirección no especificada"}
                             </Text>
 
-                            <div style={{ width: '100%', height: '220px', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '15px', border: '1px solid #ced4da' }}>
+                            <div style={{ width: '100%', height: '220px', borderRadius: '6px', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '20px', border: '1px solid #ced4da' }}>
                                 <iframe width="100%" height="100%" style={{ border: 0 }} src={urlMapaInteractivo} loading="lazy" />
                             </div>
 
-                            <Stack tokens={{ childrenGap: 12 }}>
-                                <div style={{ background: '#ffffff', padding: '12px', borderRadius: '6px', borderLeft: '4px solid #107c41', display: 'flex', alignItems: 'center' }}>
-                                    <Icon iconName="BuildDefinition" style={{ fontSize: '20px', color: '#107c41', marginRight: '10px' }} />
-                                    <Stack style={{ flexGrow: 1 }}>
-                                        <Text style={{ fontWeight: '600' }}>Planos Técnicos</Text>
-                                        <Text variant="small" style={{ color: '#a19f9d' }}>Esquemas estructurales y eléctricos</Text>
-                                    </Stack>
-                                    <IconButton iconProps={{ iconName: "DietPlanView" }} title="Ver Planos" onClick={() => alert("Módulo de planos (Próximamente)...")} />
-                                </div>
+                            {/* MODIFICADO: Renderizado dinámico de documentos de SharePoint */}
+                            <Text variant="large" style={{ fontWeight: '600', marginBottom: 10, display: 'block' }}>Documentos y Planos</Text>
+                            <Stack tokens={{ childrenGap: 10 }}>
+                                {cargandoDocs ? (
+                                    <Spinner label="Buscando documentos en el servidor..." />
+                                ) : documentosObra.length > 0 ? (
+                                    documentosObra.map((doc, idx) => {
+                                        // Asignar colores/iconos según la extensión del archivo
+                                        let iconName = "Document";
+                                        let iconColor = "#0078d4"; // Azul genérico
+                                        const nombreLower = doc.Name.toLowerCase();
+                                        
+                                        if (nombreLower.endsWith(".pdf")) { iconName = "PDF"; iconColor = "#d83b01"; }
+                                        else if (nombreLower.endsWith(".dwg")) { iconName = "VisioDocument"; iconColor = "#107c41"; }
+                                        else if (nombreLower.endsWith(".xlsx") || nombreLower.endsWith(".xls")) { iconName = "ExcelDocument"; iconColor = "#107c41"; }
+                                        else if (nombreLower.endsWith(".jpg") || nombreLower.endsWith(".png")) { iconName = "Photo2"; iconColor = "#8764b8"; }
 
-                                <div style={{ background: '#ffffff', padding: '12px', borderRadius: '6px', borderLeft: '4px solid #d83b01', display: 'flex', alignItems: 'center' }}>
-                                    <Icon iconName="PDF" style={{ fontSize: '20px', color: '#d83b01', marginRight: '10px' }} />
-                                    <Stack style={{ flexGrow: 1 }}>
-                                        <Text style={{ fontWeight: '600' }}>Documentación y Permisos</Text>
-                                        <Text variant="small" style={{ color: '#a19f9d' }}>Hojas de seguridad y actas</Text>
-                                    </Stack>
-                                    <IconButton iconProps={{ iconName: "DocumentSearch" }} title="Ver Documentos" onClick={() => alert("Biblioteca de documentos (Próximamente)...")} />
-                                </div>
+                                        return (
+                                            <div key={idx} style={{ background: '#ffffff', padding: '12px', borderRadius: '6px', borderLeft: `4px solid ${iconColor}`, display: 'flex', alignItems: 'center' }}>
+                                                <Icon iconName={iconName} style={{ fontSize: '20px', color: iconColor, marginRight: '10px' }} />
+                                                <Stack style={{ flexGrow: 1 }}>
+                                                    <Text style={{ fontWeight: '600', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{doc.Name}</Text>
+                                                </Stack>
+                                                <IconButton 
+                                                    iconProps={{ iconName: "Download" }} 
+                                                    title="Abrir o Descargar Archivo" 
+                                                    onClick={() => window.open(doc.ServerRelativeUrl, "_blank")} 
+                                                />
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <MessageBar messageBarType={MessageBarType.info}>
+                                        Aún no se han adjuntado planos ni documentos técnicos para esta obra.
+                                    </MessageBar>
+                                )}
                             </Stack>
                         </div>
 
@@ -344,7 +364,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                     </section>
                 )}
 
-                {/* PASO 3: FOTOS PREVIAS (LLEGADA) */}
                 {paso === 3 && obraSeleccionada && (
                     <section className={styles.stepContainer}>
                         <Text variant="large" className={styles.stepTitle}>3. Fotos Previas (Llegada)</Text>
@@ -385,7 +404,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                     </section>
                 )}
 
-                {/* PASO 4: GESTIONAR PERSONAL */}
                 {paso === 4 && obraSeleccionada && (
                     <section className={styles.stepContainer}>
                         <Text variant="large" className={styles.stepTitle}>4. Gestionar Personal</Text>
@@ -396,7 +414,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                         <div style={{ background: '#f3f2f1', padding: '15px', borderRadius: '8px', marginBottom: '15px' }}>
                             <Stack tokens={{ childrenGap: 20 }}>
                                 
-                                {/* 1. Control del Operario Principal (Tope en max={8}) */}
                                 {operario && operario.Id && (
                                     <div style={{ background: '#ffffff', padding: '12px', borderRadius: '6px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                                         <Persona imageUrl={operario.FotoPerfil} text={`${operario.NombreyApellido} (Tú)`} secondaryText={operario.Rol} size={PersonaSize.size32} />
@@ -414,7 +431,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                                     </div>
                                 )}
 
-                                {/* 2. Control de los Compañeros de Cuadrilla (Tope en max={8}) */}
                                 {compañeros.map((c) => {
                                     if (!c.Id) return null;
                                     const hrs = horasTrabajadas[c.Id as number] || 0;
@@ -438,7 +454,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                             </Stack>
                         </div>
 
-                        {/* Dropdown para añadir personal por imprevistos */}
                         <div style={{ marginBottom: '20px' }}>
                             <Dropdown
                                 placeholder="+ Añadir personal por imprevisto"
@@ -455,7 +470,6 @@ export const VistaFotosObra: React.FC<{ context: any }> = (props) => {
                     </section>
                 )}
 
-                {/* PASO 5: EVIDENCIA VISUAL FINAL */}
                 {paso === 5 && obraSeleccionada && (
                     <section className={styles.stepContainer}>
                         <Text variant="large" className={styles.stepTitle}>5. Evidencia Visual (Cierre)</Text>

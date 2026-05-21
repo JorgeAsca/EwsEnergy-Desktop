@@ -14,6 +14,20 @@ module.exports = {
       rules: {
 
         // PAra hacer las pruebas
+        // Permite promesas sin await (actualmente en 2, cámbialo a 0 para desactivar)
+  '@typescript-eslint/no-floating-promises': 0,
+
+  // Permite usar "any" (actualmente en 1, cámbialo a 0)
+  '@typescript-eslint/no-explicit-any': 0,
+
+  // Permite usar funciones antes de definirlas (actualmente en 2, cámbialo a 0)
+  '@typescript-eslint/no-use-before-define': 0,
+
+  // Permite no definir el tipo de retorno en funciones (actualmente en 1, cámbialo a 0)
+  '@typescript-eslint/explicit-function-return-type': 0,
+
+  // Permite variables no utilizadas (cámbialo a 0)
+  '@typescript-eslint/no-unused-vars': 0,
 
         "@typescript-eslint/no-floating-promises": "off",
   "@typescript-eslint/no-use-before-define": "off",
