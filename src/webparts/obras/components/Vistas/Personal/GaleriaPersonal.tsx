@@ -38,8 +38,10 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
   // Referencia para el input de archivo oculto
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  // --- AÑADIDO CAMPO EMAIL AL ESTADO ---
   const [formulario, setFormulario] = React.useState({
     NombreyApellido: "",
+    Email: "",
     Rol: "",
     FotoPerfil: "" 
   });
@@ -67,9 +69,11 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
   }, []);
 
   const abrirEdicion = (emp: IPersonal) => {
-    setEditandoId(emp.Id);
+    setEditandoId(emp.Id as number);
     setFormulario({
       NombreyApellido: emp.NombreyApellido,
+      // @ts-ignore - Asegúrate de que tu modelo IPersonal incluya la propiedad Email si usas TypeScript estricto
+      Email: emp.Email || "",
       Rol: emp.Rol || (rolOptions[0]?.key as string) || "",
       FotoPerfil: emp.FotoPerfil || ""
     });
@@ -78,7 +82,7 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
 
   const abrirNuevo = () => {
     setEditandoId(null);
-    setFormulario({ NombreyApellido: "", Rol: (rolOptions[0]?.key as string) || "", FotoPerfil: "" });
+    setFormulario({ NombreyApellido: "", Email: "", Rol: (rolOptions[0]?.key as string) || "", FotoPerfil: "" });
     setIsOpen(true);
   };
 
@@ -208,6 +212,15 @@ export const GaleriaPersonal: React.FC<{ context: any }> = (props) => {
               value={formulario.NombreyApellido} 
               onChange={(_, v) => setFormulario({ ...formulario, NombreyApellido: v || "" })} 
             />
+            
+            {/* --- NUEVO CAMPO EMAIL --- */}
+            <TextField 
+              label="Correo electrónico" 
+              placeholder="ejemplo@gmail.com"
+              value={formulario.Email} 
+              onChange={(_, v) => setFormulario({ ...formulario, Email: v || "" })} 
+            />
+
             <Dropdown 
               label="Rol / Cargo" 
               options={rolOptions} 
