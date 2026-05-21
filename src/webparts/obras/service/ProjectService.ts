@@ -6,6 +6,7 @@ import { IFacepilePersona } from "@fluentui/react";
 export class ProjectService {
   private _context: any;
   private _listName: string = "Proyectos y Obras";
+  private _docLibraryName: string = "Documentos_Obras"; // <-- NOMBRE DE TU BIBLIOTECA
 
   constructor(context: any) {
     this._context = context;
@@ -34,7 +35,8 @@ export class ProjectService {
     }
   }
 
-  public async crearObra(nuevaObra: any): Promise<void> {
+  // MODIFICADO: Ahora devuelve el ID (number) de la obra creada
+  public async crearObra(nuevaObra: any): Promise<number> {
     const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items`;
     const body = JSON.stringify({
       Title: nuevaObra.Nombre,
@@ -47,18 +49,78 @@ export class ProjectService {
       ProgresoReal: 0,
     });
 
-    await this._context.spHttpClient.post(
+    const response = await this._context.spHttpClient.post(
       endpoint,
       SPHttpClient.configurations.v1,
       {
         headers: {
-          Accept: "application/json;odata=nometadata",
+          Accept: "application/json", // Sin nometadata para poder leer el ID devuelto
           "Content-type": "application/json;odata=nometadata",
           "odata-version": "",
         },
         body: body,
       },
     );
+
+    const data = await response.json();
+    return data.Id; // Retorna el ID generado en SharePoint
+  }
+
+  // NUEVO: Convierte el File a buffer para subirlo
+  private async _fileToArrayBuffer(file: File): Promise<ArrayBuffer> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as ArrayBuffer);
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // NUEVO: Crea la carpeta en la biblioteca si no existe
+  public async asegurarCarpeta(nombreCarpeta: string): Promise<void> {
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/folders/add('${this._docLibraryName}/${nombreCarpeta}')`;
+    try {
+      await this._context.spHttpClient.post(endpoint, SPHttpClient.configurations.v1, {
+        headers: { Accept: "application/json;odata=nometadata" }
+      });
+    } catch (e) {
+      console.warn("La carpeta ya existe o hubo un aviso:", e);
+    }
+  }
+
+  public async getDocumentosPorObra(idObra: number): Promise<any[]> {
+    const nombreCarpeta = `Obra_${idObra}`;
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/GetFolderByServerRelativeUrl('${this._docLibraryName}/${nombreCarpeta}')/Files`;
+    
+    try {
+      const response = await this._context.spHttpClient.get(endpoint, SPHttpClient.configurations.v1, {
+        headers: { Accept: "application/json" }
+      });
+      
+      if (!response.ok) {
+        return []; // Si da error (ej: la carpeta aún no existe), devolvemos array vacío
+      }
+      
+      const data = await response.json();
+      return data.value || [];
+    } catch (e) {
+      console.warn("No se encontraron documentos o la carpeta no existe:", e);
+      return [];
+    }
+  }
+
+  // NUEVO: Sube el archivo a la carpeta específica
+  public async subirArchivoACarpeta(nombreCarpeta: string, file: File): Promise<void> {
+    const buffer = await this._fileToArrayBuffer(file);
+    // Limpiamos el nombre del archivo para que no de error en SharePoint por caracteres raros
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_'); 
+    
+    const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/getfolderbyserverrelativeurl('${this._docLibraryName}/${nombreCarpeta}')/files/add(url='${cleanFileName}', overwrite=true)`;
+    
+    await this._context.spHttpClient.post(endpoint, SPHttpClient.configurations.v1, {
+      headers: { Accept: "application/json;odata=nometadata" },
+      body: buffer
+    });
   }
 
   public async actualizarObra(id: number, obraActualizada: any): Promise<void> {
@@ -109,14 +171,9 @@ export class ProjectService {
     );
   }
 
-  public async actualizarProgresoObra(
-    id: number,
-    nuevoProgreso: number,
-  ): Promise<void> {
+  public async actualizarProgresoObra(id: number, nuevoProgreso: number): Promise<void> {
     const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
-    const body = JSON.stringify({
-      ProgresoReal: nuevoProgreso,
-    });
+    const body = JSON.stringify({ ProgresoReal: nuevoProgreso });
 
     await this._context.spHttpClient.post(
       endpoint,
@@ -134,10 +191,7 @@ export class ProjectService {
     );
   }
 
-  public async actualizarEstado(
-    id: number,
-    nuevoEstado: string,
-  ): Promise<void> {
+  public async actualizarEstado(id: number, nuevoEstado: string): Promise<void> {
     const endpoint = `${this._context.pageContext.web.absoluteUrl}/_api/web/lists/getbytitle('${this._listName}')/items(${id})`;
 
     await this._context.spHttpClient.post(
@@ -152,7 +206,6 @@ export class ProjectService {
           "odata-version": "",
         },
         body: JSON.stringify({
-          // Asegúrate de que 'Estado' sea el nombre interno de tu columna en SharePoint
           Estado: nuevoEstado,
         }),
       },
@@ -169,7 +222,6 @@ export class ProjectService {
       );
 
       if (!response.ok) {
-        // Esto nos imprimirá el error real de SharePoint en la consola
         const errorText = await response.text();
         console.error("Error detallado de SharePoint:", errorText);
         return [];
@@ -185,9 +237,6 @@ export class ProjectService {
 
   public async getAsignacionesConPersonal(): Promise<any[]> {
     const siteUrl = this._context.pageContext.web.absoluteUrl;
-
-    // 1. Obtenemos las asignaciones y expandimos el campo Personal (que debe ser un Lookup a la lista Personal_EWS)
-    // Usamos $expand para traer los datos del operario en la misma consulta
     const endpoint = `${siteUrl}/_api/web/lists/getbytitle('Asignaciones_Obras')/items?$select=Id,ObraId,Personal/NombreyApellido,Personal/FotoPerfil&$expand=Personal`;
 
     try {
@@ -203,15 +252,11 @@ export class ProjectService {
       }
 
       const data = await response.json();
-
-      // Mapeamos los datos para que el componente Facepile los entienda fácilmente
       return (data.value || []).map((item: any) => ({
         Id: item.Id,
         ObraId: item.ObraId,
         Personal: {
-          NombreyApellido: item.Personal
-            ? item.Personal.NombreyApellido
-            : "Sin nombre",
+          NombreyApellido: item.Personal ? item.Personal.NombreyApellido : "Sin nombre",
           FotoPerfil: item.Personal ? item.Personal.FotoPerfil : "",
         },
       }));
@@ -234,9 +279,7 @@ export class ProjectService {
           "IF-MATCH": "*",
           "odata-version": "",
         },
-        body: JSON.stringify({
-          EstadoObra: "Finalizado",
-        }),
+        body: JSON.stringify({ EstadoObra: "Finalizado" }),
       },
     );
   }
@@ -254,28 +297,18 @@ export class ProjectService {
           "IF-MATCH": "*",
           "odata-version": "",
         },
-        body: JSON.stringify({
-          EstadoObra: "Cancelado",
-        }),
+        body: JSON.stringify({ EstadoObra: "Cancelado" }),
       },
     );
   }
 
-  public async getObrasCompletas(
-    asignaciones: any[],
-    personal: any[],
-  ): Promise<IObraCard[]> {
+  public async getObrasCompletas(asignaciones: any[], personal: any[]): Promise<IObraCard[]> {
     const obras = await this.getObras();
 
     return obras.map((obra) => {
-      // Filtrar operarios asignados a esta obra
-      const asignados = asignaciones.filter(
-        (a) => Number(a.ObraId) === Number(obra.Id),
-      );
+      const asignados = asignaciones.filter((a) => Number(a.ObraId) === Number(obra.Id));
       const operariosProps: IFacepilePersona[] = asignados.map((asig) => {
-        const p = personal.find(
-          (pers) => Number(pers.Id) === Number(asig.PersonalId),
-        );
+        const p = personal.find((pers) => Number(pers.Id) === Number(asig.PersonalId));
         return { personaName: p ? p.NombreyApellido : "Desconocido" };
       });
 
@@ -284,9 +317,7 @@ export class ProjectService {
         clienteNombre: (obra as any).Cliente?.Title || "Sin Cliente",
         porcentajeReal: obra.ProgresoReal || 0,
         operarios: operariosProps,
-        jornadasConsumidas: Math.round(
-          ((obra.ProgresoReal || 0) / 100) * (obra.JornadasTotales || 30),
-        ),
+        jornadasConsumidas: Math.round(((obra.ProgresoReal || 0) / 100) * (obra.JornadasTotales || 30)),
       } as IObraCard;
     });
   }

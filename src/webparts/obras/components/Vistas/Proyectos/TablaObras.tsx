@@ -30,7 +30,7 @@ import { SPHttpClient } from "@microsoft/sp-http";
 import { ProjectService } from "../../../service/ProjectService";
 import { PersonalService } from "../../../service/PersonalService";
 import { AsignacionesService } from "../../../service/AsignacionesService";
-import { ClientesService } from "../../../service/ClientesService"; // <-- NUEVO IMPORT
+import { ClientesService } from "../../../service/ClientesService";
 import { IObraCard } from "../../../models/IObraCard";
 import styles from "./TablaObras.module.scss";
 
@@ -61,18 +61,21 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   const [obraSeleccionada, setObraSeleccionada] = React.useState<IObraCard | null>(null);
   const [fotosObra, setFotosObra] = React.useState<any[]>([]);
 
-  // Estados locales para los archivos y fotos subidas visualmente
-  const [archivosLocales, setArchivosLocales] = React.useState<{ nombre: string; icono: string }[]>([]);
-  const [fotosPreviasLocales, setFotosPreviasLocales] = React.useState<string[]>([]);
+  // Estados locales para los archivos reales
+  const [archivosLocales, setArchivosLocales] = React.useState<{ nombre: string; icono: string; file: File }[]>([]);
+  const [fotosPreviasLocales, setFotosPreviasLocales] = React.useState<{ url: string; file: File }[]>([]);
 
   const [loading, setLoading] = React.useState(true);
   const [loadingFotos, setLoadingFotos] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  
+  // NUEVO ESTADO: Para controlar el botón de subida de archivos específicos
+  const [uploadingFiles, setUploadingFiles] = React.useState(false);
+  
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [obraEditandoId, setObraEditandoId] = React.useState<number | null>(null);
 
-  // --- ESTADOS NUEVOS PARA CREACIÓN EXPRÉS DE CLIENTES ---
   const [isNuevoClienteOpen, setIsNuevoClienteOpen] = React.useState(false);
   const [nuevoClienteNombre, setNuevoClienteNombre] = React.useState("");
   const [creandoCliente, setCreandoCliente] = React.useState(false);
@@ -93,10 +96,9 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     project: new ProjectService(props.context),
     personal: new PersonalService(props.context),
     asig: new AsignacionesService(props.context),
-    clientes: new ClientesService(props.context), // <-- NUEVA INSTANCIA
+    clientes: new ClientesService(props.context),
   }), [props.context]);
 
-  // --- FUNCIÓN ASÍNCRONA EXCLUSIVA PARA ENLAZAR CLIENTES ---
   const cargarClientes = async (): Promise<IDropdownOption[]> => {
     try {
       const dataClientes = await services.clientes.getClientes();
@@ -116,7 +118,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         services.project.getObras(),
         services.asig.getAsignaciones(),
         services.personal.getPersonal(),
-        cargarClientes() // Cargamos los clientes usando el método unificado
+        cargarClientes()
       ]);
 
       const obrasProcesadas: IObraCard[] = listaObras.map((o) => {
@@ -148,23 +150,16 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
 
   React.useEffect(() => { cargarTodo(); }, []);
 
-  // --- MANEJADOR DE ALTA EXPRÉS DE CLIENTES ---
   const handleCrearClienteRapido = async () => {
     if (!nuevoClienteNombre.trim()) return;
     try {
       setCreandoCliente(true);
-      // Creamos el cliente en la lista
       await services.clientes.crearCliente({ Title: nuevoClienteNombre });
-      
-      // Refrescamos las opciones del dropdown
       const nuevasOpciones = await cargarClientes();
-      
-      // Buscamos el cliente creado para dejarlo auto-seleccionado al instante
       const clienteCreado = nuevasOpciones.find(c => c.text.toLowerCase() === nuevoClienteNombre.trim().toLowerCase());
       if (clienteCreado) {
         setNuevaObra(prev => ({ ...prev, ClienteId: clienteCreado.key as number }));
       }
-
       setIsNuevoClienteOpen(false);
       setNuevoClienteNombre("");
     } catch (e) {
@@ -174,12 +169,10 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     }
   };
 
-  // ─── INICIALIZAR MAPA ───────────────────────────────────────────────────────
   React.useEffect(() => {
     if (!isOpen) return;
     const timer = setTimeout(() => {
       if (!mapRef.current || mapInstanceRef.current) return;
-
       if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link");
         link.id = "leaflet-css";
@@ -195,10 +188,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       });
 
-      const map = L.map(mapRef.current, {
-        tap: false,
-        dragging: true 
-      } as L.MapOptions).setView([40.416775, -3.70379], 6);
+      const map = L.map(mapRef.current, { tap: false, dragging: true } as L.MapOptions).setView([40.416775, -3.70379], 6);
 
       if (mapRef.current) {
         L.DomEvent.disableClickPropagation(mapRef.current);
@@ -216,7 +206,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
         else markerRef.current = L.marker([lat, lng], { draggable: true }).addTo(map);
       });
-
       mapInstanceRef.current = map;
     }, 400); 
     
@@ -248,7 +237,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     return () => clearTimeout(debounce);
   }, [nuevaObra.Direccion]);
 
-  // --- MANEJADORES ---
   const verDetallesObra = async (obra: IObraCard) => {
     setObraSeleccionada(obra);
     setLoadingFotos(true);
@@ -267,8 +255,8 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       let icono = "Document";
       if (file.name.endsWith(".pdf")) icono = "PDF";
       if (file.name.endsWith(".dwg")) icono = "VisioDocument";
-      if (file.name.endsWith(".xlsx")) icono = "ExcelDocument";
-      setArchivosLocales(prev => [...prev, { nombre: file.name, icono }]);
+      if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) icono = "ExcelDocument";
+      setArchivosLocales(prev => [...prev, { nombre: file.name, icono, file }]);
       if (inputArchivoRef.current) inputArchivoRef.current.value = ""; 
     }
   };
@@ -278,7 +266,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFotosPreviasLocales(prev => [...prev, reader.result as string]);
+        setFotosPreviasLocales(prev => [...prev, { url: reader.result as string, file }]);
         if (inputFotoRef.current) inputFotoRef.current.value = ""; 
       };
       reader.readAsDataURL(file);
@@ -293,16 +281,57 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
     setFotosPreviasLocales(prev => prev.filter((_, i) => i !== index));
   };
 
+  // ─── NUEVO: FUNCIÓN ESPECÍFICA PARA CONFIRMAR Y SUBIR LOS ARCHIVOS SELECCIONADOS ───
+  const handleConfirmarSubidaArchivos = async () => {
+    if (!obraSeleccionada) return;
+    try {
+      setUploadingFiles(true);
+      const idObra = obraSeleccionada.Id as number;
+      const archivosParaSubir = [
+        ...archivosLocales.map(a => a.file),
+        ...fotosPreviasLocales.map(f => f.file)
+      ];
+
+      if (archivosParaSubir.length > 0) {
+        // Creamos la carpeta usando el ID de la obra y subimos los archivos uno por uno
+        const nombreCarpeta = `Obra_${idObra}`;
+        await services.project.asegurarCarpeta(nombreCarpeta);
+        
+        for (const file of archivosParaSubir) {
+          await services.project.subirArchivoACarpeta(nombreCarpeta, file);
+        }
+
+        alert("✅ ¡Documentos y fotografías subidos exitosamente al proyecto!");
+        // Limpiamos la bandeja visual tras el éxito
+        setArchivosLocales([]);
+        setFotosPreviasLocales([]);
+      }
+    } catch (error) {
+      alert("❌ Ocurrió un error al subir los archivos. Por favor, inténtalo de nuevo.");
+      console.error("Error subiendo archivos:", error);
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
+  // ─── MODIFICADO: Guardar Modal YA NO gestiona archivos, solo datos de texto ───
   const handleGuardar = async () => {
     if (!nuevaObra.Nombre || !nuevaObra.ClienteId) return;
     try {
       setSaving(true);
-      if (obraEditandoId) await services.project.updateObra(obraEditandoId, nuevaObra);
-      else await services.project.crearObra(nuevaObra);
+      if (obraEditandoId) {
+        await services.project.updateObra(obraEditandoId, nuevaObra);
+      } else {
+        await services.project.crearObra(nuevaObra);
+      }
+
       setIsOpen(false);
       resetForm();
       await cargarTodo();
-    } catch (e) { alert("Error al guardar."); } 
+    } catch (e) { 
+      alert("Error al guardar los datos de la obra.");
+      console.error(e);
+    } 
     finally { setSaving(false); }
   };
 
@@ -352,7 +381,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
 
   return (
     <div className={styles.container}>
-      {/* CABECERA */}
       <div className={styles.headerSection}>
         <Stack>
           <Text variant="xxLarge" className={styles.tituloPrincipal}>Panel de Control de Obras</Text>
@@ -362,7 +390,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
       </div>
 
       <div className={styles.splitLayout}>
-        {/* COLUMNA IZQUIERDA */}
         <div className={styles.listColumn}>
           <div className={styles.listContainer}>
             {Object.keys(obrasAgrupadas).length === 0 && <MessageBar>No hay proyectos registrados.</MessageBar>}
@@ -380,7 +407,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: DETALLE */}
         <div className={styles.detailColumn}>
           {obraSeleccionada ? (
             <div className={styles.detailContent}>
@@ -408,7 +434,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
               </Stack>
 
-              {/* ── PLANOS Y ARCHIVOS LOCALES ───────────────────────────── */}
               <div className={styles.planosSection}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Planos y Documentación</Text>
@@ -417,7 +442,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </Stack>
                 
                 <Stack horizontal tokens={{ childrenGap: 15 }} wrap>
-                  {/* Renderizamos solo los archivos reales que suba el usuario */}
                   {archivosLocales.length > 0 ? (
                     archivosLocales.map((archivo, idx) => (
                       <div key={idx} className={styles.planoCard} style={{ position: 'relative', paddingRight: '28px' }}>
@@ -432,12 +456,11 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                       </div>
                     ))
                   ) : (
-                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay documentos adjuntos en esta obra.</Text>
+                    <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay documentos adjuntos en esta sesión.</Text>
                   )}
                 </Stack>
               </div>
 
-              {/* ── FOTOS PREVIAS/FINALES LOCALES ───────────────────────────── */}
               <div className={styles.planosSection} style={{ marginTop: 20 }}>
                 <Stack horizontal horizontalAlign="space-between" verticalAlign="center" styles={{ root: { marginBottom: 15 } }}>
                   <Text variant="large" className={styles.sectionTitle}>Fotografías Previas / Finales</Text>
@@ -447,9 +470,9 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
 
                 {fotosPreviasLocales.length > 0 ? (
                   <Stack horizontal tokens={{ childrenGap: 10 }} wrap>
-                    {fotosPreviasLocales.map((fotoUrl, idx) => (
+                    {fotosPreviasLocales.map((fotoObj, idx) => (
                       <div key={idx} style={{ position: "relative", display: "inline-block" }}>
-                        <Image src={fotoUrl} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '1px solid #ccc' }} />
+                        <Image src={fotoObj.url} width={150} height={100} imageFit={ImageFit.cover} style={{ borderRadius: '6px', border: '1px solid #ccc' }} />
                         <IconButton
                           iconProps={{ iconName: "Cancel" }}
                           title="Eliminar foto"
@@ -463,9 +486,32 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                     ))}
                   </Stack>
                 ) : (
-                  <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay fotos previas cargadas.</Text>
+                  <Text variant="small" style={{ fontStyle: "italic", color: "#888" }}>No hay fotos previas cargadas en esta sesión.</Text>
                 )}
               </div>
+
+              {/* ─── BANDEJA DE SUBIDA: SOLO APARECE SI HAY ARCHIVOS O FOTOS SELECCIONADOS ─── */}
+              {(archivosLocales.length > 0 || fotosPreviasLocales.length > 0) && (
+                <div style={{ marginTop: 25, padding: '15px 20px', backgroundColor: '#e1dfdd', borderRadius: '8px', border: '1px solid #c8c6c4' }}>
+                  <Stack horizontal verticalAlign="center" horizontalAlign="space-between">
+                    <Stack>
+                      <Text variant="mediumPlus" style={{ fontWeight: 600, color: '#201f1e' }}>
+                        Tienes {archivosLocales.length + fotosPreviasLocales.length} archivo(s) sin subir
+                      </Text>
+                      <Text variant="small" style={{ color: '#605e5c' }}>
+                        Pincha en confirmar para guardarlos en la nube del proyecto.
+                      </Text>
+                    </Stack>
+                    <PrimaryButton 
+                      text={uploadingFiles ? "Subiendo..." : "Confirmar Subida"} 
+                      iconProps={{ iconName: "CloudUpload" }} 
+                      onClick={handleConfirmarSubidaArchivos} 
+                      disabled={uploadingFiles} 
+                      styles={{ root: { backgroundColor: '#0078d4' } }}
+                    />
+                  </Stack>
+                </div>
+              )}
 
               <div className={styles.historialSection}>
                 <Text variant="large" className={styles.sectionTitle}>Reportes de Jornada</Text>
@@ -529,7 +575,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
             <Stack tokens={{ childrenGap: 15 }}>
               <TextField label="Nombre del Proyecto / Frente" required value={nuevaObra.Nombre} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Nombre: v || "" })} />
               
-              {/* ── SECCIÓN MODIFICADA: SELECCIÓN Y ALTA EXPRÉS DE CLIENTES ── */}
               <Stack horizontal verticalAlign="end" tokens={{ childrenGap: 8 }}>
                 <Stack.Item grow={1}>
                   <Dropdown 
@@ -548,11 +593,9 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                   styles={{ root: { marginBottom: '2px', backgroundColor: '#f3f2f1', borderRadius: '4px', height: 32, width: 32 } }}
                 />
               </Stack>
-              {/* ────────────────────────────────────────────────────────────── */}
 
               <TextField label="Dirección de Obra" value={nuevaObra.Direccion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Direccion: v || "" })} prefix="📍" />
               
-              {/* ── MAPA INTERACTIVO COMPLETAMENTE LIMPIO ────────────────────── */}
               <div>
                 <div
                   ref={mapRef}
@@ -563,7 +606,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                   📌 El mapa se centra al escribir la dirección · Clic para mover el marcador
                 </Text>
               </div>
-              {/* ────────────────────────────────────────────────────────────── */}
 
               <Stack horizontal tokens={{ childrenGap: 20 }}>
                 <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
@@ -584,7 +626,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
         </div>
       </Modal>
 
-      {/* ── CUADRO DE DIÁLOGO SECUNDARIO: CREACIÓN EXPRÉS DE CLIENTES ── */}
       <Dialog
         hidden={!isNuevoClienteOpen}
         onDismiss={() => setIsNuevoClienteOpen(false)}
@@ -613,7 +654,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
           )}
         </DialogFooter>
       </Dialog>
-      {/* ────────────────────────────────────────────────────────────── */}
     </div>
   );
 };
