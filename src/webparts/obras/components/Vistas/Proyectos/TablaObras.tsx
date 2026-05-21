@@ -68,7 +68,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
   // Archivos reales ya traídos desde la nube de SharePoint
   const [archivosNube, setArchivosNube] = React.useState<any[]>([]);
 
-  // NUEVO ESTADO: Para controlar qué foto se está viendo en grande
+  // Para controlar qué foto se está viendo en grande (Lightbox)
   const [fotoAmpliada, setFotoAmpliada] = React.useState<string | null>(null);
 
   const [loading, setLoading] = React.useState(true);
@@ -450,9 +450,18 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 <div className={`${styles.badgeEstado} ${obraSeleccionada.EstadoObra === "Finalizado" ? styles.finalizado : obraSeleccionada.EstadoObra === "Cancelado" ? styles.cancelado : styles.activo}`}>
                   {obraSeleccionada.EstadoObra || "Fase Previa"}
                 </div>
+                {/* CORREGIDO AQUÍ: Al pinchar en editar, cargamos la variable correcta "JornadasTotales" de la obra seleccionada */}
                 <DefaultButton iconProps={{ iconName: "Edit" }} text="Editar" onClick={() => {
                   setObraEditandoId(obraSeleccionada.Id as number);
-                  setNuevaObra({ Nombre: obraSeleccionada.Title, Descripcion: obraSeleccionada.Descripcion || "", ClienteId: (clientes.find(c => c.text === obraSeleccionada.clienteNombre)?.key as number) || 0, Direccion: obraSeleccionada.DireccionObra || "", FechaInicio: new Date(obraSeleccionada.FechaInicio || Date.now()), FechaFin: new Date(obraSeleccionada.FechaFinPrevista || Date.now()), JornadasTotales: obraSeleccionada.JornadasTotales || 30 });
+                  setNuevaObra({ 
+                    Nombre: obraSeleccionada.Title, 
+                    Descripcion: obraSeleccionada.Descripcion || "", 
+                    ClienteId: (clientes.find(c => c.text === obraSeleccionada.clienteNombre)?.key as number) || 0, 
+                    Direccion: obraSeleccionada.DireccionObra || "", 
+                    FechaInicio: new Date(obraSeleccionada.FechaInicio || Date.now()), 
+                    FechaFin: new Date(obraSeleccionada.FechaFinPrevista || Date.now()), 
+                    JornadasTotales: obraSeleccionada.JornadasTotales || 30 
+                  });
                   setIsOpen(true);
                 }} />
               </Stack>
@@ -535,7 +544,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                     
                     return (
                       <div key={`nube-foto-${idx}`} style={{ position: "relative", display: "inline-block" }}>
-                        {/* AÑADIDO ONCLICK PARA ABRIR EL LIGHTBOX */}
                         <Image 
                           src={cleanLink} 
                           width={150} 
@@ -559,7 +567,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
 
                   {fotosPreviasLocales.map((fotoObj, idx) => (
                     <div key={`local-foto-${idx}`} style={{ position: "relative", display: "inline-block" }}>
-                      {/* AÑADIDO ONCLICK PARA ABRIR EL LIGHTBOX */}
                       <Image 
                         src={fotoObj.url} 
                         width={150} 
@@ -607,7 +614,6 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 </div>
               )}
 
-              {/* ── REPORTES DE JORNADA (TAMBIÉN CON LIGHTBOX INTEGRADOR) ── */}
               <div className={styles.historialSection}>
                 <Text variant="large" className={styles.sectionTitle}>Reportes de Jornada</Text>
                 {loadingFotos ? <Spinner size={SpinnerSize.large} label="Cargando reportes..." /> : fotosObra.length > 0 ? (
@@ -641,7 +647,7 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                                 imageFit={ImageFit.cover} 
                                 className={styles.fotoThumb} 
                                 style={{ borderRadius: '4px', border: '1px solid #edebe9', cursor: 'pointer' }}
-                                onClick={() => setFotoAmpliada(cleanFotoSrc)} // ABRIR EL LIGHTBOX AL PINCHAR
+                                onClick={() => setFotoAmpliada(cleanFotoSrc)} 
                               />
                             ) : (
                               <div style={{ width: 120, height: 90, backgroundColor: '#f3f2f1', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #edebe9' }}>
@@ -739,7 +745,14 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
                 <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
                 <DatePicker label="Fecha Fin Prevista" value={nuevaObra.FechaFin} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaFin: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
               </Stack>
-              <TextField label="Jornadas Presupuestadas" type="number" required value={nuevaObra.JornadasTotales.toString()} onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} />
+              {/* CORREGIDO AQUÍ: Guardamos correctamente la propiedad "JornadasTotales" en el onChange en lugar de "Jornadas" */}
+              <TextField 
+                label="Jornadas Presupuestadas" 
+                type="number" 
+                required 
+                value={nuevaObra.JornadasTotales.toString()} 
+                onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} 
+              />
               <TextField label="Descripción" multiline rows={3} value={nuevaObra.Descripcion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Descripcion: v || "" })} />
             </Stack>
           </div>
