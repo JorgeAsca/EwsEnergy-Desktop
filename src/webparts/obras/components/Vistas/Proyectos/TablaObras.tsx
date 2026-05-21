@@ -608,8 +608,26 @@ export const TablaObras: React.FC<{ context: any }> = (props) => {
               </div>
 
               <Stack horizontal tokens={{ childrenGap: 20 }}>
-                <DatePicker label="Fecha Inicio" value={nuevaObra.FechaInicio} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
-                <DatePicker label="Fecha Fin Prevista" value={nuevaObra.FechaFin} onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaFin: d || new Date() })} strings={stringsEspanol} firstDayOfWeek={DayOfWeek.Monday} formatDate={(date) => date ? date.toLocaleDateString() : ''} styles={{ root: { flex: 1 } }} />
+                <DatePicker 
+                  label="Fecha Inicio" 
+                  value={nuevaObra.FechaInicio} 
+                  onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaInicio: d || new Date() })} 
+                  strings={stringsEspanol} 
+                  firstDayOfWeek={DayOfWeek.Monday} 
+                  formatDate={(date) => date ? date.toLocaleDateString() : ''} 
+                  styles={{ root: { flex: 1 } }} 
+                  calloutProps={{ className: "calendario-fix-ews" }} // <--- EL FIX AQUÍ
+                />
+                <DatePicker 
+                  label="Fecha Fin Prevista" 
+                  value={nuevaObra.FechaFin} 
+                  onSelectDate={(d) => setNuevaObra({ ...nuevaObra, FechaFin: d || new Date() })} 
+                  strings={stringsEspanol} 
+                  firstDayOfWeek={DayOfWeek.Monday} 
+                  formatDate={(date) => date ? date.toLocaleDateString() : ''} 
+                  styles={{ root: { flex: 1 } }} 
+                  calloutProps={{ className: "calendario-fix-ews" }} // <--- Y AQUÍ
+                />
               </Stack>
               <TextField label="Jornadas Presupuestadas" type="number" required value={nuevaObra.JornadasTotales.toString()} onChange={(_, v) => setNuevaObra({ ...nuevaObra, JornadasTotales: parseInt(v || "0") })} />
               <TextField label="Descripción" multiline rows={3} value={nuevaObra.Descripcion} onChange={(_, v) => setNuevaObra({ ...nuevaObra, Descripcion: v || "" })} />

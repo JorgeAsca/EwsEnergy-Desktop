@@ -144,9 +144,10 @@ export const VistaAsignaciones: React.FC<{ context: any }> = (props) => {
                         placeholder="¿Qué día asiste a la obra?"
                         value={seleccion.fechaFin}
                         onSelectDate={(date) => setSeleccion((prev) => ({ ...prev, fechaFin: date || new Date() }))}
-                        strings={stringsEspanol} // <--- TRADUCCIÓN APLICADA AQUÍ
-                        firstDayOfWeek={DayOfWeek.Monday} // <--- LA SEMANA EMPIEZA EN LUNES
-                        formatDate={(date) => date ? date.toLocaleDateString() : ''} // Formato local de fecha (ej: DD/MM/YYYY)
+                        strings={stringsEspanol} 
+                        firstDayOfWeek={DayOfWeek.Monday} 
+                        formatDate={(date) => date ? date.toLocaleDateString() : ''} 
+                        calloutProps={{ className: "calendario-fix-ews" }} // <--- EL FIX ESTÁ AQUÍ
                     />
 
                     <PrimaryButton

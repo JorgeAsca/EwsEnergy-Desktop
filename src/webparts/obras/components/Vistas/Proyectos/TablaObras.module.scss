@@ -406,3 +406,31 @@ $texto-negro: #323130;
     padding: 0 !important;
   }
 }
+
+/* --- FIX PARA EL CALENDARIO APLASTADO EN SHAREPOINT --- */
+:global(.calendario-fix-ews) {
+  /* Forzamos el modelo de caja correcto */
+  * {
+    box-sizing: border-box !important;
+  }
+  
+  /* Separamos el selector de días del selector de meses */
+  .ms-Calendar-wrap {
+    display: flex !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  /* Le damos un ancho mínimo para que SharePoint no lo aplaste */
+  .ms-Calendar {
+    min-width: 320px !important;
+  }
+
+  /* Aseguramos que los números tengan su espacio */
+  .ms-CalendarDay-day, 
+  .ms-CalendarPicker-day, 
+  .ms-CalendarDay-weekday {
+    min-width: 30px !important;
+    justify-content: center !important;
+  }
+}
